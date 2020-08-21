@@ -12,7 +12,7 @@ The FTC Match Uploader script requires [OBS Studio](https://obsproject.com/) and
 
 ## Script Setup
 
-To set up FTC Match Uploader for subsequent use (as in this only needs to be done once per system), the `google-api-python-client` and `google-auth-oauthlib` Python packages must be installed. To install them in Windows, open a PowerShell or CMD command prompt and run the command `%LOCALAPPDATA%\Programs\Python\Python36\Scripts\pip.exe install google-api-python-client google-auth-oauthlib`.
+To set up FTC Match Uploader for subsequent use (as in this only needs to be done once per system), the `google-api-python-client` and `google-auth-oauthlib` Python packages must be installed. To install them in Windows, open a PowerShell or CMD command prompt and run the command `%LOCALAPPDATA%\Programs\Python\Python36\Scripts\pip.exe install -U google-api-python-client google-auth-oauthlib`.
 
 
 ## OBS Profile Setup
