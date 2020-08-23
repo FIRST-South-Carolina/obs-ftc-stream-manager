@@ -185,7 +185,7 @@ if obs is None:
                 if response_code != 200:
                     print(f'  The Orange Alliance match video update failed with unexpected status code {response_code} and response: {response}', file=sys.stderr)
             except urllib.error.HTTPError as e:
-                    print(f'  The Orange Alliance match video update failed with status code {e.code}', file=sys.stderr)
+                print(f'  The Orange Alliance match video update failed with status code {e.code}', file=sys.stderr)
 
 
     commands = {
