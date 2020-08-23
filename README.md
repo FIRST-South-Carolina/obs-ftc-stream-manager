@@ -1,6 +1,6 @@
 # FTC Match Uploader
 
-FTC Match Uploader is an OBS Studio script that provides hotkeys for starting and stopping match recordings, automatically determining the match being recorded from the FTCLive scoring system, naming and uploading the match video to YouTube on completion, optionally associating that video with a YouTube playlist (e.g. an event playlist), and optionally associating that match video with a match in [The Orange Alliance](https://theorangealliance.org/).
+FTC Match Uploader is an [OBS Studio](https://obsproject.com) script for [FIRST Tech Challenge](https://www.firstinspires.org/robotics/ftc) events that provides hotkeys for starting and stopping match recordings, automatically determining the match being recorded from the FTCLive scoring system, naming and uploading the match video to YouTube on completion, optionally associating that video with a YouTube playlist (e.g. an event playlist), and optionally associating that match video with a match in [The Orange Alliance](https://theorangealliance.org/).
 
 Keep the OBS "Script Log" open to see output from hotkeys and settings buttons.
 
