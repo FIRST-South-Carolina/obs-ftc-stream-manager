@@ -35,9 +35,9 @@ Load `ftc-match-uploader.py` into OBS Studio (if not already loaded). In the scr
 * Scorekeeper API - base URL to FTCLive API; default is "http://localhost/api" which will generally only need to be changed if the FTCLive software is running on another machine
 * TOA Key (optional) - key for The Orange Alliance API which has access to set match videos for the current event (generally event admin or enough permission to do DataSync will work)
 * TOA Event Code (optional) - event code in The Orange Alliance for the current event
-* Google API Project ID - project ID to authenticate to Google APIs (generated from Google Developer Console for your organization)
-* Google API Client ID - client ID to authenticate to Google APIs (generated from Google Developer Console for your organization)
-* Google API Client Secret - client secret to authenticate to Google APIs (generated from Google Developer Console for your organization)
+* Google API Project ID - project ID to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
+* Google API Client ID - client ID to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
+* Google API Client Secret - client secret to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
 
 Assuming connection to the scorekeeper is successful, the match type, pair, number, and code data will be automatically populated. Do not change those settings if intending to use this with the FTCLive scoring software.
 
