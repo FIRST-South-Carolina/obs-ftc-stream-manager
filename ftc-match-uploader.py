@@ -6,6 +6,7 @@ except ImportError:
 if obs is None:
     # upload video from parameters
     import datetime
+    import http.client
     import json
     import os
     import os.path
@@ -14,6 +15,8 @@ if obs is None:
     import time
     import urllib.error
     import urllib.request
+
+    import httplib2
 
     import google.oauth2.credentials
 
@@ -104,15 +107,7 @@ if obs is None:
             try:
                 status, response = request.next_chunk()
             except googleapiclient.errors.HttpError as e:
-                if e.resp.status in [404]:
-                    request = youtube.videos().insert(
-                        part=','.join(request_body.keys()),
-                        body=request_body,
-                        media_body=googleapiclient.http.MediaFileUpload(path, chunksize=-1, resumable=True),
-                    )
-
-                    tries = 1
-                elif e.resp.status in [500, 502, 503, 504]:
+                if e.resp.status in [500, 502, 503, 504]:
                     if tries >= 10:
                         raise RuntimeError(f'YouTube upload failed after {tries} tries with status code {e.resp.status}')
 
@@ -120,6 +115,12 @@ if obs is None:
                     tries += 1
                 else:
                     raise
+            except (httplib2.HttpLib2Error, IOError, http.client.NotConnected, http.client.IncompleteRead, http.client.ImproperConnectionState, http.client.CannotSendRequest, http.client.CannotSendHeader, http.client.ResponseNotReady, http.client.BadStatusLine) as e:
+                if tries >= 10:
+                    raise RuntimeError(f'YouTube upload failed after {tries} tries with error: {e}')
+
+                time.sleep(random.randint(1, 2 ** tries))
+                tries += 1
 
         if 'id' not in response:
             print(f'  YouTube upload failed with unexpected response: {response}', file=sys.stderr)
