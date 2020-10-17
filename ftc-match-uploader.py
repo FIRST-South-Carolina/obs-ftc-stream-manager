@@ -447,6 +447,8 @@ else:
 
         log_fd, log_path = tempfile.mkstemp(suffix='.txt')
 
+        print(f'  Log Path: {log_path}')
+
         children.append((subprocess.Popen([python_path, __file__, 'refresh', metadata_path], stdin=subprocess.DEVNULL, stdout=log_fd, stderr=subprocess.STDOUT), log_path))
 
         os.close(log_fd)
@@ -469,6 +471,8 @@ else:
         print(f'  Metadata Path: {metadata_path}')
 
         log_fd, log_path = tempfile.mkstemp(suffix='.txt')
+
+        print(f'  Log Path: {log_path}')
 
         children.append((subprocess.Popen([python_path, __file__, 'delete', metadata_path], stdin=subprocess.DEVNULL, stdout=log_fd, stderr=subprocess.STDOUT), log_path))
 
@@ -523,6 +527,8 @@ else:
             print(f'  Metadata Path: {metadata_path}')
 
             log_fd, log_path = tempfile.mkstemp(suffix='.txt')
+
+            print(f'  Log Path: {log_path}')
 
             children.append((subprocess.Popen([python_path, __file__, 'upload', metadata_path], stdin=subprocess.DEVNULL, stdout=log_fd, stderr=subprocess.STDOUT), log_path))
 
