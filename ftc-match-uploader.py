@@ -176,7 +176,7 @@ if obs is None:
                 'video_url': link,
             }
 
-            toa_request = urllib.request.Request('https://api.theorangealliance.org/api/match/video', data=json.dumps(toa_body).encode('utf-8'), headers=toa_headers, method='PUT')
+            toa_request = urllib.request.Request('https://theorangealliance.org/api/match/video', data=json.dumps(toa_body).encode('utf-8'), headers=toa_headers, method='PUT')
 
             try:
                 with urllib.request.urlopen(toa_request) as toa:
