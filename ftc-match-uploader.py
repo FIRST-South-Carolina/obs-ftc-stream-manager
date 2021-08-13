@@ -368,9 +368,11 @@ else:
 
 
     def check_children():
-        for idx, (child, log) in enumerate(children.copy()):
+        reaped = []
+        for child, log in children:
             if child.poll() is not None:
-                del children[idx]
+                reaped.append(child)
+
                 if child.returncode != 0:
                     print(f'ERROR: Subprocess exited with code {child.returncode}: {child.args}')
                     with open(log, 'r') as logf:
@@ -380,6 +382,9 @@ else:
                     os.remove(log)
                 except OSError:
                     print(f'WARNING: Failed to remove log file: {log}')
+
+        if reaped:
+            children[:] = ((child, log) for child, log in children if child not in reaped)
 
 
     def get_match_name():
