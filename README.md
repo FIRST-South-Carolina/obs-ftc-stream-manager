@@ -10,7 +10,7 @@ Keep the OBS "Script Log" open to see output from hotkeys and settings buttons.
 The FTC Match Uploader script requires [OBS Studio](https://obsproject.com/) and Python 3.6+. OBS Studio only supports Python 3.6 on Windows currently and the latest Windows installer available is [Python 3.6.8](https://www.python.org/ftp/python/3.6.8/python-3.6.8-amd64.exe). From the OBS Studio software, select "Tools" from the menu bar and "Scripts" from the menu, go to the "Python Settings" tab, and select the base prefix for Python 3.6+. For Windows, the base prefix will be `%LOCALAPPDATA%\Programs\Python\Python36`. To load one of the scripts below, go back to the "Scripts" tab and click the "+" in the lower-left and navigate to the appropriate script file.
 
 
-## Script Setup
+## FTC Match Uploader Setup
 
 To set up FTC Match Uploader for subsequent use (as in this only needs to be done once per system), the `google-api-python-client` and `google-auth-oauthlib` Python packages must be installed. To install them in Windows, open a PowerShell or CMD command prompt and run the command `%LOCALAPPDATA%\Programs\Python\Python36\Scripts\pip.exe install -U google-api-python-client google-auth-oauthlib`.
 
