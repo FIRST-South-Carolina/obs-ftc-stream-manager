@@ -354,13 +354,29 @@ else:
         recording_props = obs.obs_properties_create()
         obs.obs_properties_add_group(props, 'recording', 'Recording', obs.OBS_GROUP_NORMAL, recording_props)
 
-        obs.obs_properties_add_text(recording_props, 'video_encoder', 'Video Encoder', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_int(recording_props, 'video_bitrate', 'Video Bitrate', 0, 6000, 50)
-        obs.obs_properties_add_text(recording_props, 'audio_encoder', 'Audio Encoder', obs.OBS_TEXT_DEFAULT)
+        video_encoder_prop = obs.obs_properties_add_list(recording_props, 'video_encoder', 'Video Encoder (H.264)', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
+        obs.obs_property_list_add_string(video_encoder_prop, 'x264', 'obs_x264')
+        if obs.obs_encoder_get_display_name('jim_nvenc'):
+            obs.obs_property_list_add_string(video_encoder_prop, 'NVENC', 'jim_nvenc')
+        elif obs.obs_encoder_get_display_name('ffmpeg_nvenc'):
+            obs.obs_property_list_add_string(video_encoder_prop, 'NVENC', 'ffmpeg_nvenc')
+        if obs.obs_encoder_get_display_name('amd_amf_h264'):
+            obs.obs_property_list_add_string(video_encoder_prop, 'AMF', 'amd_amf_h264')
+        if obs.obs_encoder_get_display_name('obs_qsv11'):
+            obs.obs_property_list_add_string(video_encoder_prop, 'QuickSync', 'obs_qsv11')
+        obs.obs_properties_add_int(recording_props, 'video_bitrate', 'Video Bitrate', 0, 24000, 50)
+        audio_encoder_prop = obs.obs_properties_add_list(recording_props, 'audio_encoder', 'Audio Encoder (AAC)', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
+        obs.obs_property_list_add_string(audio_encoder_prop, 'FFmpeg', 'ffmpeg_aac')
+        if obs.obs_encoder_get_display_name('mf_aac'):
+            obs.obs_property_list_add_string(audio_encoder_prop, 'MediaFoundation', 'mf_aac')
+        if obs.obs_encoder_get_display_name('libfdk_aac'):
+            obs.obs_property_list_add_string(audio_encoder_prop, 'Fraunhofer FDK', 'libfdk_aac')
+        if obs.obs_encoder_get_display_name('CoreAudio_AAC'):
+            obs.obs_property_list_add_string(audio_encoder_prop, 'CoreAudio', 'CoreAudio_AAC')
         obs.obs_properties_add_int(recording_props, 'audio_bitrate', 'Audio Bitrate', 0, 2000, 1)
 
         match_props = obs.obs_properties_create()
-        obs.obs_properties_add_group(props, 'match', 'Match', obs.OBS_GROUP_NORMAL, match_props)
+        obs.obs_properties_add_group(props, 'match', 'Match (Internal Settings)', obs.OBS_GROUP_NORMAL, match_props)
 
         match_type_prop = obs.obs_properties_add_list(match_props, 'match_type', 'Match Type', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
         obs.obs_property_list_add_string(match_type_prop, 'Qualification', 'qualification')
@@ -498,9 +514,11 @@ else:
 
         # release output (which should then be garbage collected)
         obs.obs_output_release(output)
-        obs.obs_encoder_release(output_video_encoder)
-        obs.obs_encoder_release(output_audio_encoder)
         output = None
+        obs.obs_encoder_release(output_video_encoder)
+        output_video_encoder = None
+        obs.obs_encoder_release(output_audio_encoder)
+        output_audio_encoder = None
 
         print()
 
