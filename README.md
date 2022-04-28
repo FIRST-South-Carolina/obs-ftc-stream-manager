@@ -31,10 +31,13 @@ Load `ftc-match-uploader.py` into OBS Studio (if not already loaded). In the scr
 * YouTube Category ID - numeric ID of the desired YouTube category for the video; default is 28 which is "Science & Technology" but 27 is "Education" if that is preferred
 * YouTube Privacy Status - whether to set the video as public or not; default is "Private" but this should be "Public" or "Unlisted" during actual events
 * YouTube Playlist (optional) - the playlist ID to put the uploaded video into
+
 * Event Code - event code in FTCLive to pull active match from; only used if connection to scorekeeper is successful
 * Scorekeeper API - base URL to FTCLive API; default is "http://localhost/api" which will generally only need to be changed if the FTCLive software is running on another machine
+
 * TOA Key (optional) - key for The Orange Alliance API which has access to set match videos for the current event (generally event admin or enough permission to do DataSync will work)
 * TOA Event Code (optional) - event code in The Orange Alliance for the current event
+
 * Google API Project ID - project ID to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
 * Google API Client ID - client ID to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
 * Google API Client Secret - client secret to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
