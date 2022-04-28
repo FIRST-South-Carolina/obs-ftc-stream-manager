@@ -123,7 +123,6 @@ if obs is None:
                 tries += 1
 
         if 'id' not in response:
-            print(f'  YouTube upload failed with unexpected response: {response}', file=sys.stderr)
             raise RuntimeError(f'YouTube upload failed with unexpected response: {response}')
 
         video = response['id']
@@ -188,6 +187,11 @@ if obs is None:
             except urllib.error.HTTPError as e:
                 print(f'  The Orange Alliance match video update failed with status code {e.code}', file=sys.stderr)
 
+        try:
+            os.remove(path)
+        except OSError:
+            raise RuntimeError(f'Error removing video file: {path}')
+
 
     commands = {
         'refresh': refresh_credentials,
@@ -208,7 +212,7 @@ if obs is None:
         with open(sys.argv[2], 'r') as f:
             metadata = json.load(f)
     except (OSError, ValueError):
-        print(f'Error reading metadata file: {sys.argv[2]}', file=sys.stderr)
+        print(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Error reading metadata file: {sys.argv[2]}', file=sys.stderr)
         sys.exit(1)
 
     try:
@@ -222,7 +226,7 @@ if obs is None:
         try:
             os.remove(sys.argv[2])
         except OSError:
-            print(f'Error removing metadata file: {sys.argv[2]}', file=sys.stderr)
+            print(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Error removing metadata file: {sys.argv[2]}', file=sys.stderr)
             sys.exit(1)
 else:
     # implement OBS-side of the plugin
@@ -245,12 +249,13 @@ else:
     settings = None
     hotkeys = {}
 
+    output = None
     action = 'none'
     children = []
 
 
     def script_description():
-        return '<b>FTC Match Uploader</b><hr/>Cut and upload FTC matches to YouTube during a stream. Optionally add those videos to a playlist or add those videos to an event on The Orange Alliance.<br/><br/>Requires "Standard" recording output type. "Custom Output (FFmpeg)" will not work.<br/><br/>Made by Lily Foster &lt;lily@lily.flowers&gt;'
+        return '<b>FTC Match Uploader</b><hr/>Cut and upload FTC matches to YouTube during a stream. Optionally add those videos to a playlist or add those videos to an event on The Orange Alliance.<br/><br/>Made by Lily Foster &lt;lily@lily.flowers&gt;'
 
 
     def script_load(settings_):
@@ -262,9 +267,6 @@ else:
 
         # run child reaper every second
         obs.timer_add(check_children, 1000)
-
-        # stop recording callback
-        obs.obs_frontend_add_event_callback(stop_recording_action)
 
         # get saved hotkey data
         hotkey_start = obs.obs_data_get_array(settings, 'hotkey_start')
@@ -287,6 +289,10 @@ else:
         obs.obs_data_array_release(hotkey_cancel)
 
 
+    def script_unload():
+        destroy_match_video_output()
+
+
     def script_save(settings):
         # save hotkey data
         hotkey_start = obs.obs_hotkey_save(hotkeys['start'])
@@ -307,39 +313,62 @@ else:
     def script_properties():
         props = obs.obs_properties_create()
 
-        obs.obs_properties_add_text(props, 'event_name', 'Event Name', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(props, 'youtube_description', 'YouTube Description', obs.OBS_TEXT_MULTILINE)
-        obs.obs_properties_add_text(props, 'youtube_category_id', 'YouTube Category ID', obs.OBS_TEXT_DEFAULT)
-        youtube_privacy_status_prop = obs.obs_properties_add_list(props, 'youtube_privacy_status', 'YouTube Privacy Status', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
+        youtube_props = obs.obs_properties_create()
+        obs.obs_properties_add_group(props, 'youtube', 'YouTube', obs.OBS_GROUP_NORMAL, youtube_props)
+
+        obs.obs_properties_add_text(youtube_props, 'event_name', 'Event Name', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(youtube_props, 'youtube_description', 'YouTube Description', obs.OBS_TEXT_MULTILINE)
+        obs.obs_properties_add_text(youtube_props, 'youtube_category_id', 'YouTube Category ID', obs.OBS_TEXT_DEFAULT)
+        youtube_privacy_status_prop = obs.obs_properties_add_list(youtube_props, 'youtube_privacy_status', 'YouTube Privacy Status', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
         obs.obs_property_list_add_string(youtube_privacy_status_prop, 'Public', 'public')
         obs.obs_property_list_add_string(youtube_privacy_status_prop, 'Unlisted', 'unlisted')
         obs.obs_property_list_add_string(youtube_privacy_status_prop, 'Private', 'private')
-        obs.obs_properties_add_text(props, 'youtube_playlist', 'YouTube Playlist', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(youtube_props, 'youtube_playlist', 'YouTube Playlist', obs.OBS_TEXT_DEFAULT)
 
-        obs.obs_properties_add_text(props, 'event_code', 'Event Code', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(props, 'scorekeeper_api', 'Scorekeeper API', obs.OBS_TEXT_DEFAULT)
+        scorekeeper_props = obs.obs_properties_create()
+        obs.obs_properties_add_group(props, 'scorekeeper', 'Scorekeeper', obs.OBS_GROUP_NORMAL, scorekeeper_props)
 
-        obs.obs_properties_add_text(props, 'toa_key', 'TOA Key', obs.OBS_TEXT_PASSWORD)
-        obs.obs_properties_add_text(props, 'toa_event', 'TOA Event Code', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scorekeeper_props, 'event_code', 'Event Code', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scorekeeper_props, 'scorekeeper_api', 'Scorekeeper API', obs.OBS_TEXT_DEFAULT)
 
-        obs.obs_properties_add_text(props, 'google_project_id', 'Google API Project ID', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(props, 'google_client_id', 'Google API Client ID', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(props, 'google_client_secret', 'Google API Client Secret', obs.OBS_TEXT_PASSWORD)
+        obs.obs_properties_add_button(scorekeeper_props, 'test_scorekeeper_connection', 'Test Scorekeeper Connection', test_scorekeeper_connection)
 
-        match_type_prop = obs.obs_properties_add_list(props, 'match_type', 'Match Type', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
+        toa_props = obs.obs_properties_create()
+        obs.obs_properties_add_group(props, 'toa', 'The Orange Alliance', obs.OBS_GROUP_NORMAL, toa_props)
+
+        obs.obs_properties_add_text(toa_props, 'toa_key', 'TOA Key', obs.OBS_TEXT_PASSWORD)
+        obs.obs_properties_add_text(toa_props, 'toa_event', 'TOA Event Code', obs.OBS_TEXT_DEFAULT)
+
+        google_props = obs.obs_properties_create()
+        obs.obs_properties_add_group(props, 'google', 'Google API', obs.OBS_GROUP_NORMAL, google_props)
+
+        obs.obs_properties_add_text(google_props, 'google_project_id', 'Google API Project ID', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(google_props, 'google_client_id', 'Google API Client ID', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(google_props, 'google_client_secret', 'Google API Client Secret', obs.OBS_TEXT_PASSWORD)
+
+        obs.obs_properties_add_button(google_props, 'refresh_google_authentication', 'Refresh Google Authentication', refresh_google_authentication)
+        obs.obs_properties_add_button(google_props, 'delete_google_authentication', 'Delete Google Authentication', delete_google_authentication)
+
+        recording_props = obs.obs_properties_create()
+        obs.obs_properties_add_group(props, 'recording', 'Recording', obs.OBS_GROUP_NORMAL, recording_props)
+
+        obs.obs_properties_add_text(recording_props, 'video_encoder', 'Video Encoder', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_int(recording_props, 'video_bitrate', 'Video Bitrate', 0, 6000, 50)
+        obs.obs_properties_add_text(recording_props, 'audio_encoder', 'Audio Encoder', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_int(recording_props, 'audio_bitrate', 'Audio Bitrate', 0, 2000, 1)
+
+        match_props = obs.obs_properties_create()
+        obs.obs_properties_add_group(props, 'match', 'Match', obs.OBS_GROUP_NORMAL, match_props)
+
+        match_type_prop = obs.obs_properties_add_list(match_props, 'match_type', 'Match Type', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
         obs.obs_property_list_add_string(match_type_prop, 'Qualification', 'qualification')
         obs.obs_property_list_add_string(match_type_prop, 'Semi-Final', 'semi-final')
         obs.obs_property_list_add_string(match_type_prop, 'Final', 'final')
-        obs.obs_properties_add_int(props, 'match_pair', 'Match Pair', 1, 2, 1)
-        obs.obs_properties_add_int(props, 'match_number', 'Match Number', 1, 50, 1)
-        obs.obs_properties_add_int(props, 'match_code', 'Match Code', 1, 50, 1)
+        obs.obs_properties_add_int(match_props, 'match_pair', 'Match Pair', 1, 2, 1)
+        obs.obs_properties_add_int(match_props, 'match_number', 'Match Number', 1, 50, 1)
+        obs.obs_properties_add_int(match_props, 'match_code', 'Match Code', 1, 50, 1)
 
-        obs.obs_properties_add_button(props, 'reset_match_info', 'Reset Match Info', reset_match_info)
-
-        obs.obs_properties_add_button(props, 'test_scorekeeper_connection', 'Test Scorekeeper Connection', test_scorekeeper_connection)
-
-        obs.obs_properties_add_button(props, 'refresh_google_authentication', 'Refresh Google Authentication', refresh_google_authentication)
-        obs.obs_properties_add_button(props, 'delete_google_authentication', 'Delete Google Authentication', delete_google_authentication)
+        obs.obs_properties_add_button(match_props, 'reset_match_info', 'Reset Match Info', reset_match_info)
 
         return props
 
@@ -361,10 +390,117 @@ else:
         obs.obs_data_set_default_string(settings, 'google_client_id', '')
         obs.obs_data_set_default_string(settings, 'google_client_secret', '')
 
+        obs.obs_data_set_default_string(settings, 'video_encoder', 'obs_x264')
+        obs.obs_data_set_default_int(settings, 'video_bitrate', 2500)
+        obs.obs_data_set_default_string(settings, 'audio_encoder', 'ffmpeg_aac')
+        obs.obs_data_set_default_int(settings, 'audio_bitrate', 192)
+
         obs.obs_data_set_default_string(settings, 'match_type', 'qualification')
         obs.obs_data_set_default_int(settings, 'match_pair', 1)
         obs.obs_data_set_default_int(settings, 'match_number', 1)
         obs.obs_data_set_default_int(settings, 'match_code', 1)
+
+
+    def script_update(settings):
+        if output:
+            destroy_match_video_output()
+        create_match_video_output()
+
+
+    def create_match_video_output():
+        global output, output_video_encoder, output_audio_encoder
+
+        print(f'Creating match video OBS output')
+
+        if output:
+            print(f'WARNING: Match video OBS output already exists')
+            print()
+            return
+
+        # create output for match video files
+        output_settings = obs.obs_data_create()
+        obs.obs_data_set_bool(output_settings, 'allow_overwrite', True)
+        output = obs.obs_output_create('ffmpeg_muxer', 'match_file_output', output_settings, None)
+        obs.obs_data_release(output_settings)
+        if not output:
+            print(f'ERROR: Could not create match video output')
+            print()
+            return
+
+        # create output video encoder for match video files
+        output_video_settings = obs.obs_data_create()
+        obs.obs_data_set_string(output_video_settings, 'rate_control', 'CBR')
+        obs.obs_data_set_int(output_video_settings, 'bitrate', obs.obs_data_get_int(settings, 'video_bitrate'))
+        output_video_encoder = obs.obs_video_encoder_create(obs.obs_data_get_string(settings, 'video_encoder'), 'match_video_encoder', output_video_settings, None)
+        obs.obs_data_release(output_video_settings)
+        if not output_video_encoder:
+            print(f'ERROR: Could not create match video encoder')
+            destroy_match_video_output()
+            return
+        if not obs.obs_encoder_get_codec(output_video_encoder):
+            print(f'ERROR: Invalid codec for match video encoder')
+            destroy_match_video_output()
+            return
+        obs.obs_encoder_set_video(output_video_encoder, obs.obs_get_video())
+        if not obs.obs_encoder_video(output_video_encoder):
+            print(f'ERROR: Could not set video handler')
+            destroy_match_video_output()
+            return
+        obs.obs_output_set_video_encoder(output, output_video_encoder)
+        if not obs.obs_output_get_video_encoder(output):
+            print(f'ERROR: Could not set video encoder to output')
+            destroy_match_video_output()
+            return
+
+        # create output audio encoder for match video files
+        output_audio_settings = obs.obs_data_create()
+        obs.obs_data_set_string(output_audio_settings, 'rate_control', 'CBR')
+        obs.obs_data_set_int(output_audio_settings, 'bitrate', obs.obs_data_get_int(settings, 'audio_bitrate'))
+        output_audio_encoder = obs.obs_audio_encoder_create(obs.obs_data_get_string(settings, 'audio_encoder'), 'match_audio_encoder', output_audio_settings, 0, None)
+        obs.obs_data_release(output_audio_settings)
+        if not output_audio_encoder:
+            print(f'ERROR: Could not create match audio encoder')
+            destroy_match_video_output()
+            return
+        if not obs.obs_encoder_get_codec(output_audio_encoder):
+            print(f'ERROR: Invalid codec for match audio encoder')
+            destroy_match_video_output()
+            return
+        obs.obs_encoder_set_audio(output_audio_encoder, obs.obs_get_audio())
+        if not obs.obs_encoder_audio(output_audio_encoder):
+            print(f'ERROR: Could not set audio handler')
+            destroy_match_video_output()
+            return
+        obs.obs_output_set_audio_encoder(output, output_audio_encoder, 0)
+        if not obs.obs_output_get_audio_encoder(output, 0):
+            print(f'ERROR: Could not set audio encoder to output')
+            destroy_match_video_output()
+            return
+
+        # set handler for output signals
+        handler = obs.obs_output_get_signal_handler(output)
+        obs.signal_handler_connect(handler, 'stop', stop_recording_action)
+
+        print()
+
+
+    def destroy_match_video_output():
+        global output, output_video_encoder, output_audio_encoder
+
+        print(f'Destroying match video OBS output')
+
+        if not output:
+            print(f'WARNING: Match video OBS output does not exist')
+            print()
+            return
+
+        # release output (which should then be garbage collected)
+        obs.obs_output_release(output)
+        obs.obs_encoder_release(output_video_encoder)
+        obs.obs_encoder_release(output_audio_encoder)
+        output = None
+
+        print()
 
 
     def check_children():
@@ -486,19 +622,25 @@ else:
         print()
 
 
-    def stop_recording_action(event):
+    def stop_recording_action(calldata):
         global action
 
-        if event != obs.OBS_FRONTEND_EVENT_RECORDING_STOPPED:
+        signal_output = obs.calldata_ptr(calldata, 'output')
+        code = obs.calldata_int(calldata, 'code')
+
+        if signal_output != output:
+            print(f'WARNING: Match stop recording signal called with non-match output')
+            print()
             return
 
-        output = obs.obs_frontend_get_recording_output()
         output_settings = obs.obs_output_get_settings(output)
-
         video_path = obs.obs_data_get_string(output_settings, 'path')
-
         obs.obs_data_release(output_settings)
-        obs.obs_output_release(output)
+
+        if code != 0:  # OBS_OUTPUT_SUCCESS == 0
+            print(f'ERROR: Match recording not stopped successfully')
+            print()
+            return
 
         if action == 'upload':
             print(f'Uploading recording for {get_match_name()} at "{video_path}"')
@@ -554,11 +696,22 @@ else:
         if pressed:
             return
 
-        if obs.obs_frontend_recording_active():
+        if obs.obs_output_active(output):
             print(f'WARNING: Currently recording {get_match_name()}')
+            print()
             return
 
-        obs.obs_frontend_recording_start()
+        match_fd, match_path = tempfile.mkstemp(suffix='.mkv')
+
+        output_settings = obs.obs_data_create()
+        obs.obs_data_set_string(output_settings, 'path', f'{match_path}')
+        obs.obs_output_update(output, output_settings)
+        obs.obs_data_release(output_settings)
+
+        if not obs.obs_output_start(output):
+            print(f'ERROR: Could not start match recording: {obs.obs_output_get_last_error(output) or "Unknown error"}')
+            print()
+            return
 
         if obs.obs_data_get_string(settings, 'scorekeeper_api') and obs.obs_data_get_string(settings, 'event_code'):
             try:
@@ -593,7 +746,7 @@ else:
             except Exception:
                 print(f'WARNING: Failed to communicate with scorekeeper')
 
-        print(f'Recording starting for {get_match_name()}')
+        print(f'Recording started for {get_match_name()}')
 
 
     def stop_recording_and_upload(pressed=False):
@@ -602,13 +755,14 @@ else:
         if pressed:
             return
 
-        if not obs.obs_frontend_recording_active():
+        if not obs.obs_output_active(output):
             print(f'WARNING: Not currently recording a match')
+            print()
             return
 
         action = 'upload'
 
-        obs.obs_frontend_recording_stop()
+        obs.obs_output_stop(output)
 
         print(f'Recording stopping for {get_match_name()}')
 
@@ -619,12 +773,13 @@ else:
         if pressed:
             return
 
-        if not obs.obs_frontend_recording_active():
+        if not obs.obs_output_active(output):
             print(f'WARNING: Not currently recording a match')
+            print()
             return
 
         action = 'cancel'
 
-        obs.obs_frontend_recording_stop()
+        obs.obs_output_stop(output)
 
         print(f'Recording stopping for {get_match_name()}')
