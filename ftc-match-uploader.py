@@ -250,6 +250,8 @@ else:
     hotkeys = {}
 
     output = None
+    output_video_encoder = None
+    output_audio_encoder = None
     action = 'none'
     children = []
 
