@@ -292,6 +292,8 @@ else:
 
 
     def script_unload():
+        obs.timer_remove(check_children)
+
         destroy_match_video_output()
 
 
