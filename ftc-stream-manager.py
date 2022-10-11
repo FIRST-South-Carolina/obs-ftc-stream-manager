@@ -230,14 +230,20 @@ if obs is None:
             sys.exit(1)
 else:
     # implement OBS-side of the plugin
+    import asyncio
     import json
     import os
     import os.path
+    import queue
     import subprocess
     import sys
     import tempfile
+    import threading
+    import time
     import urllib.error
     import urllib.request
+
+    import websockets
 
 
     if sys.platform == 'win32':
@@ -248,6 +254,11 @@ else:
 
     settings = None
     hotkeys = {}
+    thread = None
+
+    comm = None
+    stop = None
+    lock = None
 
     output = None
     output_video_encoder = None
@@ -255,44 +266,85 @@ else:
     action = 'none'
     children = []
 
+    reconnect_tries = 0
+    post_time = -1
+
+    msg_mapping = {
+        'MATCH_LOAD': 'match_load',
+        'MATCH_START': 'match_start',
+        'MATCH_ABORT': 'match_abort',
+        'MATCH_COMMIT': 'match_commit',
+        'MATCH_POST': 'match_post',
+        # state for an alternative scene between matches - not sent by scorekeeper
+        'MATCH_WAIT': 'match_wait',
+    }
+
 
     def script_description():
-        return '<b>FTC Match Uploader</b><hr/>Cut and upload FTC matches to YouTube during a stream. Optionally add those videos to a playlist or add those videos to an event on The Orange Alliance.<br/><br/>Made by Lily Foster &lt;lily@lily.flowers&gt;'
+        return '<b>FTC Stream Manager</b><hr/>Automatically switch OBS scenes based on events from the FTCLive scorekeeping software as well as cut and upload FTC matches to YouTube during a stream. Optionally can add those videos to a playlist or add those videos to an event on The Orange Alliance.<br/><br/>Made by Lily Foster &lt;lily@lily.flowers&gt;'
 
 
     def script_load(settings_):
-        global settings
+        global settings, comm, stop, lock
 
         settings = settings_
 
         reset_match_info()
 
+        # cross-thread communication
+        comm = queue.Queue(32)
+        stop = threading.Event()
+        lock = threading.Lock()
+
         # run child reaper every second
         obs.timer_add(check_children, 1000)
+
+        # websocket thread communication checker
+        obs.timer_add(check_websocket, 100)
 
         # get saved hotkey data
         hotkey_start = obs.obs_data_get_array(settings, 'hotkey_start')
         hotkey_stop = obs.obs_data_get_array(settings, 'hotkey_stop')
         hotkey_cancel = obs.obs_data_get_array(settings, 'hotkey_cancel')
+        hotkey_enable = obs.obs_data_get_array(settings, 'hotkey_enable')
+        hotkey_disable = obs.obs_data_get_array(settings, 'hotkey_disable')
 
         # register hotkeys
-        hotkeys['start'] = obs.obs_hotkey_register_frontend('ftc-match-uploader_start', '(FTC) Start recording a match', start_recording)
-        hotkeys['stop'] = obs.obs_hotkey_register_frontend('ftc-match-uploader_stop', '(FTC) Stop recording a match and upload to YouTube', stop_recording_and_upload)
-        hotkeys['cancel'] = obs.obs_hotkey_register_frontend('ftc-match-uploader_cancel', '(FTC) Stop recording a match but cancel uploading to YouTube', stop_recording_and_cancel)
+        hotkeys['start'] = obs.obs_hotkey_register_frontend('ftc-stream-manager_start', '(FTC) Start recording a match', start_recording)
+        hotkeys['stop'] = obs.obs_hotkey_register_frontend('ftc-stream-manager_stop', '(FTC) Stop recording a match and upload to YouTube', stop_recording_and_upload)
+        hotkeys['cancel'] = obs.obs_hotkey_register_frontend('ftc-stream-manager_cancel', '(FTC) Stop recording a match but cancel uploading to YouTube', stop_recording_and_cancel)
+        hotkeys['enable'] = obs.obs_hotkey_register_frontend('ftc-stream-manager_enable', '(FTC) Enable automatic scene switcher and recorder', enable_switcher)
+        hotkeys['disable'] = obs.obs_hotkey_register_frontend('ftc-stream-manager_disable', '(FTC) Disable automatic scene switcher and recorder', disable_switcher)
 
         # load saved hotkey data
         obs.obs_hotkey_load(hotkeys['start'], hotkey_start)
         obs.obs_hotkey_load(hotkeys['stop'], hotkey_stop)
         obs.obs_hotkey_load(hotkeys['cancel'], hotkey_cancel)
+        obs.obs_hotkey_load(hotkeys['enable'], hotkey_enable)
+        obs.obs_hotkey_load(hotkeys['disable'], hotkey_disable)
 
         # release data references
         obs.obs_data_array_release(hotkey_start)
         obs.obs_data_array_release(hotkey_stop)
         obs.obs_data_array_release(hotkey_cancel)
+        obs.obs_data_array_release(hotkey_enable)
+        obs.obs_data_array_release(hotkey_disable)
 
 
     def script_unload():
+        global thread
+
         obs.timer_remove(check_children)
+
+        # stop websocket thread
+        if thread and thread.is_alive():
+            stop.set()
+            thread.join()
+
+            thread = None
+
+        # stop communication checker
+        obs.timer_remove(check_websocket)
 
         destroy_match_video_output()
 
@@ -302,16 +354,22 @@ else:
         hotkey_start = obs.obs_hotkey_save(hotkeys['start'])
         hotkey_stop = obs.obs_hotkey_save(hotkeys['stop'])
         hotkey_cancel = obs.obs_hotkey_save(hotkeys['cancel'])
+        hotkey_enable = obs.obs_hotkey_save(hotkeys['enable'])
+        hotkey_disable = obs.obs_hotkey_save(hotkeys['disable'])
 
         # set hotkey data
         obs.obs_data_set_array(settings, 'hotkey_start', hotkey_start)
         obs.obs_data_set_array(settings, 'hotkey_stop', hotkey_stop)
         obs.obs_data_set_array(settings, 'hotkey_cancel', hotkey_cancel)
+        obs.obs_data_set_array(settings, 'hotkey_enable', hotkey_enable)
+        obs.obs_data_set_array(settings, 'hotkey_disable', hotkey_disable)
 
         # release data references
         obs.obs_data_array_release(hotkey_start)
         obs.obs_data_array_release(hotkey_stop)
         obs.obs_data_array_release(hotkey_cancel)
+        obs.obs_data_array_release(hotkey_enable)
+        obs.obs_data_array_release(hotkey_disable)
 
 
     def script_properties():
@@ -334,6 +392,7 @@ else:
 
         obs.obs_properties_add_text(scorekeeper_props, 'event_code', 'Event Code', obs.OBS_TEXT_DEFAULT)
         obs.obs_properties_add_text(scorekeeper_props, 'scorekeeper_api', 'Scorekeeper API', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scorekeeper_props, 'scorekeeper_ws', 'Scorekeeper WS', obs.OBS_TEXT_DEFAULT)
 
         obs.obs_properties_add_button(scorekeeper_props, 'test_scorekeeper_connection', 'Test Scorekeeper Connection', test_scorekeeper_connection)
 
@@ -352,6 +411,22 @@ else:
 
         obs.obs_properties_add_button(google_props, 'refresh_google_authentication', 'Refresh Google Authentication', refresh_google_authentication)
         obs.obs_properties_add_button(google_props, 'delete_google_authentication', 'Delete Google Authentication', delete_google_authentication)
+
+        switcher_props = obs.obs_properties_create()
+        obs.obs_properties_add_group(props, 'switcher', 'Switcher', obs.OBS_GROUP_NORMAL, switcher_props)
+        obs.obs_properties_add_bool(switcher_props, 'switcher_enabled', 'Automatic Switcher and Recording Handler')
+        obs.obs_properties_add_bool(switcher_props, 'override_non_match_scenes', 'Override Non-Match Scenes')
+        obs.obs_properties_add_int(switcher_props, 'match_wait_time', 'Match Post Time to Match Wait', -1, 600, 1)
+
+        scene_props = obs.obs_properties_create()
+        obs.obs_properties_add_group(props, 'scene', 'Scenes', obs.OBS_GROUP_NORMAL, scene_props)
+
+        obs.obs_properties_add_text(scene_props, 'match_load', 'Match Load', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_start', 'Match Start', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_abort', 'Match Abort', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_commit', 'Match Commit', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_post', 'Match Post', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_wait', 'Match Wait', obs.OBS_TEXT_DEFAULT)
 
         recording_props = obs.obs_properties_create()
         obs.obs_properties_add_group(props, 'recording', 'Recording', obs.OBS_GROUP_NORMAL, recording_props)
@@ -402,6 +477,7 @@ else:
 
         obs.obs_data_set_default_string(settings, 'event_code', 'ftc_test')
         obs.obs_data_set_default_string(settings, 'scorekeeper_api', 'http://localhost/api')
+        obs.obs_data_set_default_string(settings, 'scorekeeper_ws', 'ws://localhost/api/v2/stream/')
 
         obs.obs_data_set_default_string(settings, 'toa_key', '')
         obs.obs_data_set_default_string(settings, 'toa_event', '')
@@ -409,6 +485,17 @@ else:
         obs.obs_data_set_default_string(settings, 'google_project_id', '')
         obs.obs_data_set_default_string(settings, 'google_client_id', '')
         obs.obs_data_set_default_string(settings, 'google_client_secret', '')
+
+        obs.obs_data_set_default_bool(settings, 'switcher_enabled', True)
+        obs.obs_data_set_default_bool(settings, 'override_non_match_scenes', False)
+        obs.obs_data_set_default_int(settings, 'match_wait_time', 30)
+
+        obs.obs_data_set_default_string(settings, 'match_load', 'Match Load')
+        obs.obs_data_set_default_string(settings, 'match_start', 'Match Start')
+        obs.obs_data_set_default_string(settings, 'match_abort', 'Match Abort')
+        obs.obs_data_set_default_string(settings, 'match_commit', 'Match Commit')
+        obs.obs_data_set_default_string(settings, 'match_post', 'Match Post')
+        obs.obs_data_set_default_string(settings, 'match_wait', 'Match Wait')
 
         obs.obs_data_set_default_string(settings, 'video_encoder', 'obs_x264')
         obs.obs_data_set_default_int(settings, 'video_bitrate', 2500)
@@ -422,6 +509,22 @@ else:
 
 
     def script_update(settings):
+        global thread
+
+        if thread and thread.is_alive():
+            print(f'Disconnecting from scorekeeper WS')
+
+            stop.set()
+            thread.join()
+
+            thread = None
+
+        if obs.obs_data_get_bool(settings, 'switcher_enabled'):
+            print(f'Connecting to scorekeeper WS')
+
+            thread = threading.Thread(target=lambda: asyncio.run(run_websocket(obs.obs_data_get_string(settings, 'scorekeeper_ws'))))
+            thread.start()
+
         if output:
             destroy_match_video_output()
         create_match_video_output()
@@ -543,6 +646,88 @@ else:
 
         if reaped:
             children[:] = ((child, log) for child, log in children if child not in reaped)
+
+
+    def check_websocket():
+        global thread, reconnect_tries, post_time
+
+        if not obs.obs_data_get_bool(settings, 'switcher_enabled'):
+            return
+
+        if thread and not thread.is_alive():
+            # thread died and needs to be retried or cleaned up
+            print(f'ERROR: Connection to scorekeeper WS failed')
+            print()
+
+            # lock for reconnect_tries
+            with lock:
+                if reconnect_tries < 10:
+                    # retry a few times by running the script reload callback
+                    reconnect_tries += 1
+                else:
+                    # just give up and manually cleanup thread
+                    thread = None
+
+            if thread:
+                # in a different conditional so lock can be released
+                print(f'WARNING: Retrying scorekeeper connection')
+                script_update()
+
+            # no return to let queue continue to be cleared since we are enabled
+
+        try:
+            while True:
+                if obs.obs_source_get_name(obs.obs_frontend_get_current_scene()) == obs.obs_data_get_string(settings, 'match_post') and obs.obs_data_get_int(settings, 'match_wait_time') >= 0 and post_time >= 0 and time.time() >= post_time + obs.obs_data_get_int(settings, 'match_wait_time'):
+                    # still in match post scene and timer has been reached - set to match wait
+                    scene = 'match_wait'
+                    post_time = -1
+                else:
+                    # check websocket for events
+                    msg = comm.get_nowait()
+                    scene = msg_mapping[msg['updateType']]
+
+                # bail if not currently on a recognized scene
+                if not obs.obs_data_get_bool(settings, 'override_non_match_scenes') and obs.obs_source_get_name(obs.obs_frontend_get_current_scene()) not in map(lambda scene: obs.obs_data_get_string(settings, scene), msg_mapping.values()):
+                    print(f'WARNING: Ignoring scorekeeper event because the current scene is unrecognized and overriding unrecognized scenes is disabled')
+                    print()
+                    continue
+
+                print(f'Switching scene to {obs.obs_data_get_string(settings, scene)}')
+                print()
+
+                # find and set the current scene based on websocket or wait set above
+                sources = obs.obs_enum_sources()
+                for source in sources:
+                    if obs.obs_source_get_type(source) == obs.OBS_SOURCE_TYPE_SCENE and obs.obs_source_get_name(source) == obs.obs_data_get_string(settings, scene):
+                        obs.obs_frontend_set_current_scene(source)
+                        break
+                obs.source_list_release(sources)
+
+                if scene == 'match_load':
+                    start_recording()
+                elif scene == 'match_post':
+                    # record when a scene was switched to match post
+                    post_time = time.time()
+                elif scene == 'match_wait':
+                    stop_recording_and_upload()
+        except queue.Empty:
+            pass
+
+
+    async def run_websocket(uri):
+        global reconnect_tries
+
+        async with websockets.connect(uri) as websocket:
+            with lock:
+                reconnect_tries = 0
+
+            # thread kill-switch check
+            while not stop.is_set():
+                try:
+                    # try to get something from websocket and put it in queue for main thread (dropping events when queue is full)
+                    comm.put_nowait(json.loads(await asyncio.wait_for(websocket.recv(), 0.2)))
+                except (asyncio.TimeoutError, queue.Full):
+                    pass
 
 
     def get_match_name():
@@ -805,3 +990,25 @@ else:
         obs.obs_output_stop(output)
 
         print(f'Recording stopping for {get_match_name()}')
+
+
+    def enable_switcher(pressed=False):
+        if pressed:
+            return
+
+        obs.obs_data_set_bool(settings, 'switcher_enabled', True)
+
+        print(f'Enabling scene switcher')
+
+        script_update()
+
+
+    def disable_switcher(pressed=False):
+        if pressed:
+            return
+
+        print(f'Disabling scene switcher')
+
+        obs.obs_data_set_bool(settings, 'switcher_enabled', False)
+
+        script_update()
