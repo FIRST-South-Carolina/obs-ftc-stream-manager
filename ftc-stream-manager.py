@@ -509,25 +509,44 @@ else:
 
 
     def script_update(settings):
-        global thread
-
         if thread and thread.is_alive():
-            print(f'Disconnecting from scorekeeper WS')
-
-            stop.set()
-            thread.join()
-
-            thread = None
-
+            disconnect_scorekeeper_websocket()
         if obs.obs_data_get_bool(settings, 'switcher_enabled'):
-            print(f'Connecting to scorekeeper WS')
-
-            thread = threading.Thread(target=lambda: asyncio.run(run_websocket(obs.obs_data_get_string(settings, 'scorekeeper_ws'))))
-            thread.start()
+            connect_scorekeeper_websocket()
 
         if output:
             destroy_match_video_output()
         create_match_video_output()
+
+
+    def connect_scorekeeper_websocket():
+        global thread
+
+        print(f'Connecting to scorekeeper WS')
+
+        if thread and thread.is_alive():
+            print(f'WARNING: Scorekeeper WS is already connected')
+            print()
+            return
+
+        thread = threading.Thread(target=lambda: asyncio.run(run_websocket(obs.obs_data_get_string(settings, 'scorekeeper_ws'))))
+        thread.start()
+
+
+    def disconnect_scorekeeper_websocket():
+        global thread
+
+        print(f'Disconnecting from scorekeeper WS')
+
+        if not thread or not thread.is_alive():
+            print(f'WARNING: Scorekeeper WS is already disconnected')
+            print()
+            return
+
+        stop.set()
+        thread.join()
+
+        thread = None
 
 
     def create_match_video_output():
@@ -671,7 +690,11 @@ else:
             if thread:
                 # in a different conditional so lock can be released
                 print(f'WARNING: Retrying scorekeeper connection')
-                script_update()
+
+                thread = None
+
+                if obs.obs_data_get_bool(settings, 'switcher_enabled'):
+                    connect_scorekeeper_websocket()
 
             # no return to let queue continue to be cleared since we are enabled
 
@@ -1000,7 +1023,10 @@ else:
 
         print(f'Enabling scene switcher')
 
-        script_update()
+        if thread and thread.is_alive():
+            disconnect_scorekeeper_websocket()
+
+        connect_scorekeeper_websocket()
 
 
     def disable_switcher(pressed=False):
@@ -1011,4 +1037,5 @@ else:
 
         obs.obs_data_set_bool(settings, 'switcher_enabled', False)
 
-        script_update()
+        if thread and thread.is_alive():
+            disconnect_scorekeeper_websocket()
