@@ -258,7 +258,6 @@ else:
 
     comm = None
     stop = None
-    lock = None
 
     output = None
     output_video_encoder = None
@@ -266,7 +265,6 @@ else:
     action = 'none'
     children = []
 
-    reconnect_tries = 0
     post_time = -1
 
     msg_mapping = {
@@ -285,7 +283,7 @@ else:
 
 
     def script_load(settings_):
-        global settings, comm, stop, lock
+        global settings, comm, stop
 
         settings = settings_
 
@@ -294,7 +292,6 @@ else:
         # cross-thread communication
         comm = queue.Queue(32)
         stop = threading.Event()
-        lock = threading.Lock()
 
         # run child reaper every second
         obs.timer_add(check_children, 1000)
@@ -337,15 +334,12 @@ else:
         obs.timer_remove(check_children)
 
         # stop websocket thread
-        if thread and thread.is_alive():
-            stop.set()
-            thread.join()
-
-            thread = None
+        disconnect_scorekeeper_websocket()
 
         # stop communication checker
         obs.timer_remove(check_websocket)
 
+        # destroy extra video output
         destroy_match_video_output()
 
 
@@ -529,8 +523,10 @@ else:
             print()
             return
 
-        thread = threading.Thread(target=lambda: asyncio.run(run_websocket(obs.obs_data_get_string(settings, 'scorekeeper_ws'))))
+        thread = threading.Thread(target=lambda: asyncio.run(run_websocket(f'{obs.obs_data_get_string(settings, "scorekeeper_ws")}?code={obs.obs_data_get_string(settings, "event_code")}')))
         thread.start()
+
+        print()
 
 
     def disconnect_scorekeeper_websocket():
@@ -547,6 +543,8 @@ else:
         thread.join()
 
         thread = None
+
+        print()
 
 
     def create_match_video_output():
@@ -668,7 +666,7 @@ else:
 
 
     def check_websocket():
-        global thread, reconnect_tries, post_time
+        global thread, post_time
 
         if not obs.obs_data_get_bool(settings, 'switcher_enabled'):
             return
@@ -677,24 +675,6 @@ else:
             # thread died and needs to be retried or cleaned up
             print(f'ERROR: Connection to scorekeeper WS failed')
             print()
-
-            # lock for reconnect_tries
-            with lock:
-                if reconnect_tries < 10:
-                    # retry a few times by running the script reload callback
-                    reconnect_tries += 1
-                else:
-                    # just give up and manually cleanup thread
-                    thread = None
-
-            if thread:
-                # in a different conditional so lock can be released
-                print(f'WARNING: Retrying scorekeeper connection')
-
-                thread = None
-
-                if obs.obs_data_get_bool(settings, 'switcher_enabled'):
-                    connect_scorekeeper_websocket()
 
             # no return to let queue continue to be cleared since we are enabled
 
@@ -719,38 +699,46 @@ else:
                 print()
 
                 # find and set the current scene based on websocket or wait set above
-                sources = obs.obs_enum_sources()
+                sources = obs.obs_frontend_get_scenes()
                 for source in sources:
-                    if obs.obs_source_get_type(source) == obs.OBS_SOURCE_TYPE_SCENE and obs.obs_source_get_name(source) == obs.obs_data_get_string(settings, scene):
+                    if obs.obs_source_get_name(source) == obs.obs_data_get_string(settings, scene):
                         obs.obs_frontend_set_current_scene(source)
                         break
+                else:
+                    print(f'WARNING: Could not find scene {obs.obs_data_get_string(settings, scene)}')
+                    print()
                 obs.source_list_release(sources)
 
                 if scene == 'match_load':
                     start_recording()
+                elif scene == 'match_start':
+                    # start recording if it wasn't started with load (e.g. match was aborted and restarted without reloading)
+                    if not obs.obs_output_active(output):
+                        start_recording()
                 elif scene == 'match_post':
                     # record when a scene was switched to match post
                     post_time = time.time()
                 elif scene == 'match_wait':
                     stop_recording_and_upload()
+                elif scene == 'match_abort':
+                    stop_recording_and_cancel()
         except queue.Empty:
             pass
 
 
     async def run_websocket(uri):
-        global reconnect_tries
-
-        async with websockets.connect(uri) as websocket:
-            with lock:
-                reconnect_tries = 0
-
-            # thread kill-switch check
-            while not stop.is_set():
-                try:
-                    # try to get something from websocket and put it in queue for main thread (dropping events when queue is full)
-                    comm.put_nowait(json.loads(await asyncio.wait_for(websocket.recv(), 0.2)))
-                except (asyncio.TimeoutError, queue.Full):
-                    pass
+        try:
+            async with websockets.connect(uri) as websocket:
+                # thread kill-switch check
+                while not stop.is_set():
+                    try:
+                        # try to get something from websocket and put it in queue for main thread (dropping events when queue is full)
+                        comm.put_nowait(json.loads(await asyncio.wait_for(websocket.recv(), 0.2)))
+                    except (asyncio.TimeoutError, queue.Full):
+                        pass
+        except Exception as err:
+            # errors will be detected and reported in main thread
+            raise
 
 
     def get_match_name():
