@@ -408,7 +408,8 @@ else:
 
         switcher_props = obs.obs_properties_create()
         obs.obs_properties_add_group(props, 'switcher', 'Switcher', obs.OBS_GROUP_NORMAL, switcher_props)
-        obs.obs_properties_add_bool(switcher_props, 'switcher_enabled', 'Automatic Switcher and Recording Handler')
+        obs.obs_properties_add_bool(switcher_props, 'switcher_enabled', 'Automatic Switcher')
+        obs.obs_properties_add_bool(switcher_props, 'switcher_recording', 'Automatic Recording on Switches')
         obs.obs_properties_add_bool(switcher_props, 'override_non_match_scenes', 'Override Non-Match Scenes')
         obs.obs_properties_add_int(switcher_props, 'match_wait_time', 'Match Post Time to Match Wait', -1, 600, 1)
 
@@ -481,6 +482,7 @@ else:
         obs.obs_data_set_default_string(settings, 'google_client_secret', '')
 
         obs.obs_data_set_default_bool(settings, 'switcher_enabled', True)
+        obs.obs_data_set_default_bool(settings, 'switcher_recording', True)
         obs.obs_data_set_default_bool(settings, 'override_non_match_scenes', False)
         obs.obs_data_set_default_int(settings, 'match_wait_time', 30)
 
@@ -710,18 +712,21 @@ else:
                 obs.source_list_release(sources)
 
                 if scene == 'match_load':
-                    start_recording()
+                    if obs.obs_data_get_bool(settings, 'switcher_recording'):
+                        start_recording()
                 elif scene == 'match_start':
                     # start recording if it wasn't started with load (e.g. match was aborted and restarted without reloading)
-                    if not obs.obs_output_active(output):
+                    if obs.obs_data_get_bool(settings, 'switcher_recording') and not obs.obs_output_active(output):
                         start_recording()
                 elif scene == 'match_post':
                     # record when a scene was switched to match post
                     post_time = time.time()
                 elif scene == 'match_wait':
-                    stop_recording_and_upload()
+                    if obs.obs_output_active(output):
+                        stop_recording_and_upload()
                 elif scene == 'match_abort':
-                    stop_recording_and_cancel()
+                    if obs.obs_output_active(output):
+                        stop_recording_and_cancel()
         except queue.Empty:
             pass
 
