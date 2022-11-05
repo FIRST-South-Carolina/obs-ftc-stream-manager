@@ -686,10 +686,9 @@ else:
 
         try:
             while True:
-                if obs.obs_source_get_name(obs.obs_frontend_get_current_scene()) == obs.obs_data_get_string(settings, 'match_post') and obs.obs_data_get_int(settings, 'match_wait_time') >= 0 and post_time >= 0 and time.time() >= post_time + obs.obs_data_get_int(settings, 'match_wait_time'):
-                    # still in match post scene and timer has been reached - set to match wait
+                if obs.obs_data_get_int(settings, 'match_wait_time') >= 0 and post_time >= 0 and time.time() >= post_time + obs.obs_data_get_int(settings, 'match_wait_time'):
+                    # still in match post timer has been reached - set to match wait
                     scene = 'match_wait'
-                    post_time = -1
                 else:
                     # check websocket for events
                     msg = comm.get_nowait()
@@ -715,7 +714,14 @@ else:
                     print()
                 obs.source_list_release(sources)
 
+                # reset match post time (it gets overwritten again in conditional if transitioning to match_wait)
+                post_time = -1
+
                 if scene == 'match_load':
+                    # stop recording last match if it is still recording
+                    if obs.obs_output_active(output):
+                        stop_recording_and_upload()
+
                     if obs.obs_data_get_bool(settings, 'switcher_recording'):
                         start_recording()
                 elif scene == 'match_start':
