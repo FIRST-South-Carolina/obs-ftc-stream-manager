@@ -299,6 +299,12 @@ else:
         # websocket thread communication checker
         obs.timer_add(check_websocket, 100)
 
+        # connect to scorekeeper websocket
+        reconnect_scorekeeper_ws()
+
+        # create recording output
+        recreate_recording_output()
+
         # get saved hotkey data
         hotkey_start = obs.obs_data_get_array(settings, 'hotkey_start')
         hotkey_stop = obs.obs_data_get_array(settings, 'hotkey_stop')
@@ -388,6 +394,7 @@ else:
         obs.obs_properties_add_text(scorekeeper_props, 'scorekeeper_api', 'Scorekeeper API', obs.OBS_TEXT_DEFAULT)
         obs.obs_properties_add_text(scorekeeper_props, 'scorekeeper_ws', 'Scorekeeper WS', obs.OBS_TEXT_DEFAULT)
 
+        obs.obs_properties_add_button(scorekeeper_props, 'reconnect_scorekeeper_ws', 'Reconnect Scorekeeper WS', reconnect_scorekeeper_ws)
         obs.obs_properties_add_button(scorekeeper_props, 'test_scorekeeper_connection', 'Test Scorekeeper Connection', test_scorekeeper_connection)
 
         toa_props = obs.obs_properties_create()
@@ -447,6 +454,8 @@ else:
             obs.obs_property_list_add_string(audio_encoder_prop, 'CoreAudio', 'CoreAudio_AAC')
         obs.obs_properties_add_int(recording_props, 'audio_bitrate', 'Audio Bitrate', 0, 2000, 1)
 
+        obs.obs_properties_add_button(recording_props, 'recreate_recording_output', 'Recreate Recording Output', recreate_recording_output)
+
         match_props = obs.obs_properties_create()
         obs.obs_properties_add_group(props, 'match', 'Match (Internal Settings)', obs.OBS_GROUP_NORMAL, match_props)
 
@@ -504,17 +513,6 @@ else:
         obs.obs_data_set_default_int(settings, 'match_code', 1)
 
 
-    def script_update(settings):
-        if thread and thread.is_alive():
-            disconnect_scorekeeper_websocket()
-        if obs.obs_data_get_bool(settings, 'switcher_enabled'):
-            connect_scorekeeper_websocket()
-
-        if output:
-            destroy_match_video_output()
-        create_match_video_output()
-
-
     def connect_scorekeeper_websocket():
         global thread
 
@@ -524,6 +522,8 @@ else:
             print(f'WARNING: Scorekeeper WS is already connected')
             print()
             return
+
+        stop.clear()
 
         thread = threading.Thread(target=lambda: asyncio.run(run_websocket(f'{obs.obs_data_get_string(settings, "scorekeeper_ws")}?code={obs.obs_data_get_string(settings, "event_code")}')))
         thread.start()
@@ -678,6 +678,10 @@ else:
             print(f'ERROR: Connection to scorekeeper WS failed')
             print()
 
+            # disable switcher to prevent failure spam
+            stop.set()
+            thread = None
+
             # no return to let queue continue to be cleared since we are enabled
 
         try:
@@ -770,7 +774,7 @@ else:
 
     def test_scorekeeper_connection(prop=None, props=None):
         try:
-            with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/') as scorekeeper:
+            with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/', timeout=1) as scorekeeper:
                 scorekeeper_code = scorekeeper.getcode()
                 event_code = json.load(scorekeeper)['eventCode']
         except urllib.error.HTTPError as e:
@@ -788,6 +792,13 @@ else:
             print(f'Failed to connect to scorekeeper API')
 
         print()
+
+
+    def reconnect_scorekeeper_ws(prop=None, props=None):
+        if thread and thread.is_alive():
+            disconnect_scorekeeper_websocket()
+        if obs.obs_data_get_bool(settings, 'switcher_enabled'):
+            connect_scorekeeper_websocket()
 
 
     def refresh_google_authentication(prop=None, props=None):
@@ -843,6 +854,12 @@ else:
         os.close(log_fd)
 
         print()
+
+
+    def recreate_recording_output(prop=None, props=None):
+        if output:
+            destroy_match_video_output()
+        create_match_video_output()
 
 
     def stop_recording_action(calldata):
@@ -938,7 +955,7 @@ else:
 
         if obs.obs_data_get_string(settings, 'scorekeeper_api') and obs.obs_data_get_string(settings, 'event_code'):
             try:
-                with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/matches/active/') as matches:
+                with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/matches/active/', timeout=1) as matches:
                     match_data = json.load(matches)['matches']
 
                 if len(match_data) > 0:
@@ -950,7 +967,7 @@ else:
                         obs.obs_data_set_int(settings, 'match_pair', 1)
                         obs.obs_data_set_int(settings, 'match_number', int(match_name[1:]))
                     elif match_name[0:2] == 'SF' or match_name[0] == 'F':
-                        with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/elim/all/') as elims:
+                        with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/elim/all/', timeout=1) as elims:
                             match_code = len(json.load(elims)['matchList']) + 1
 
                         if match_name[0] == 'F':
