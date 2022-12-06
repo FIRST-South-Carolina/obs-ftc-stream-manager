@@ -7,12 +7,12 @@ Keep the OBS "Script Log" open to see output from events, hotkeys, and settings 
 
 ## OBS Scripting Setup
 
-The FTC Stream Manager script requires [OBS Studio](https://obsproject.com/) and Python 3.6+. OBS Studio supports current Python versions now on Windows, so grab the latest stable "Windows installer (64-bit)" build available at [python.org](https://www.python.org/downloads/windows/) (currently [3.11.0](https://www.python.org/ftp/python/3.11.0/python-3.11.0-amd64.exe)). From the OBS Studio software, select "Tools" from the menu bar and "Scripts" from the menu, go to the "Python Settings" tab, and select the base prefix for Python 3.6+. For Windows, the base prefix will be `%LOCALAPPDATA%\Programs\Python\Python311` (for Python 3.11). To load one of the scripts below, go back to the "Scripts" tab and click the "+" in the lower-left and navigate to the appropriate script file.
+The FTC Stream Manager script requires [OBS Studio](https://obsproject.com/) and Python 3.6+. OBS Studio supports current Python versions now on Windows, so grab the latest stable "Windows installer (64-bit)" build available at [python.org](https://www.python.org/downloads/windows/) (currently [3.10.9](https://www.python.org/ftp/python/3.10.9/python-3.10.9-amd64.exe)). From the OBS Studio software, select "Tools" from the menu bar and "Scripts" from the menu, go to the "Python Settings" tab, and select the base prefix for Python 3.6+. For Windows, the base prefix will be `%LOCALAPPDATA%\Programs\Python\Python310` (for Python 3.10). To load one of the scripts below, go back to the "Scripts" tab and click the "+" in the lower-left and navigate to the appropriate script file.
 
 
 ## FTC Stream Manager Setup
 
-To set up FTC Stream Manager for subsequent use (as in this only needs to be done once per system), the `google-api-python-client`, `google-auth-oauthlib`, and `websockets` Python packages must be installed. To install them in Windows, open a PowerShell or CMD command prompt and run the command `%LOCALAPPDATA%\Programs\Python\Python311\Scripts\pip.exe install -U google-api-python-client google-auth-oauthlib websockets` (for Python 3.11).
+To set up FTC Stream Manager for subsequent use (as in this only needs to be done once per system), the `google-api-python-client`, `google-auth-oauthlib`, and `websockets` Python packages must be installed. To install them in Windows, open a PowerShell or CMD command prompt and run the command `%LOCALAPPDATA%\Programs\Python\Python310\Scripts\pip.exe install -U google-api-python-client google-auth-oauthlib websockets` (for Python 3.10).
 
 
 ## OBS Profile Setup
