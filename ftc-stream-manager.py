@@ -269,6 +269,7 @@ else:
 
     msg_mapping = {
         'MATCH_LOAD': 'match_load',
+        'SHOW_PREVIEW': 'show_preview',
         'MATCH_START': 'match_start',
         'MATCH_ABORT': 'match_abort',
         'MATCH_COMMIT': 'match_commit',
@@ -424,6 +425,7 @@ else:
         obs.obs_properties_add_group(props, 'scene', 'Scenes', obs.OBS_GROUP_NORMAL, scene_props)
 
         obs.obs_properties_add_text(scene_props, 'match_load', 'Match Load', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'show_preview', 'Show Preview', obs.OBS_TEXT_DEFAULT)
         obs.obs_properties_add_text(scene_props, 'match_start', 'Match Start', obs.OBS_TEXT_DEFAULT)
         obs.obs_properties_add_text(scene_props, 'match_abort', 'Match Abort', obs.OBS_TEXT_DEFAULT)
         obs.obs_properties_add_text(scene_props, 'match_commit', 'Match Commit', obs.OBS_TEXT_DEFAULT)
@@ -464,8 +466,8 @@ else:
         obs.obs_property_list_add_string(match_type_prop, 'Semi-Final', 'semi-final')
         obs.obs_property_list_add_string(match_type_prop, 'Final', 'final')
         obs.obs_properties_add_int(match_props, 'match_pair', 'Match Pair', 1, 2, 1)
-        obs.obs_properties_add_int(match_props, 'match_number', 'Match Number', 1, 50, 1)
-        obs.obs_properties_add_int(match_props, 'match_code', 'Match Code', 1, 50, 1)
+        obs.obs_properties_add_int(match_props, 'match_number', 'Match Number', 1, 1000, 1)
+        obs.obs_properties_add_int(match_props, 'match_code', 'Match Code', 1, 1000, 1)
 
         obs.obs_properties_add_button(match_props, 'reset_match_info', 'Reset Match Info', reset_match_info)
 
@@ -496,6 +498,7 @@ else:
         obs.obs_data_set_default_int(settings, 'match_wait_time', 30)
 
         obs.obs_data_set_default_string(settings, 'match_load', 'Match Load')
+        obs.obs_data_set_default_string(settings, 'show_preview', 'Show Preview')
         obs.obs_data_set_default_string(settings, 'match_start', 'Match Start')
         obs.obs_data_set_default_string(settings, 'match_abort', 'Match Abort')
         obs.obs_data_set_default_string(settings, 'match_commit', 'Match Commit')
@@ -721,11 +724,15 @@ else:
                     # stop recording last match if it is still recording
                     if obs.obs_output_active(output):
                         stop_recording_and_upload()
+                elif scene == 'show_preview':
+                    # stop recording last match if it is still recording
+                    if obs.obs_output_active(output):
+                        stop_recording_and_upload()
 
                     if obs.obs_data_get_bool(settings, 'switcher_recording'):
                         start_recording()
                 elif scene == 'match_start':
-                    # start recording if it wasn't started with load (e.g. match was aborted and restarted without reloading)
+                    # start recording if it wasn't started with preview (e.g. match was aborted and restarted without re-previewing)
                     if obs.obs_data_get_bool(settings, 'switcher_recording') and not obs.obs_output_active(output):
                         start_recording()
                 elif scene == 'match_post':
