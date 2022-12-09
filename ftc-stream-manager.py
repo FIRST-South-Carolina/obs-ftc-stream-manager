@@ -270,6 +270,8 @@ else:
     msg_mapping = {
         'MATCH_LOAD': 'match_load',
         'SHOW_PREVIEW': 'show_preview',
+        'SHOW_RANDOM': 'show_random',
+        'SHOW_MATCH': 'show_match',
         'MATCH_START': 'match_start',
         'MATCH_ABORT': 'match_abort',
         'MATCH_COMMIT': 'match_commit',
@@ -426,6 +428,8 @@ else:
 
         obs.obs_properties_add_text(scene_props, 'match_load', 'Match Load', obs.OBS_TEXT_DEFAULT)
         obs.obs_properties_add_text(scene_props, 'show_preview', 'Show Preview', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'show_random', 'Show Random', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'show_match', 'Show Match', obs.OBS_TEXT_DEFAULT)
         obs.obs_properties_add_text(scene_props, 'match_start', 'Match Start', obs.OBS_TEXT_DEFAULT)
         obs.obs_properties_add_text(scene_props, 'match_abort', 'Match Abort', obs.OBS_TEXT_DEFAULT)
         obs.obs_properties_add_text(scene_props, 'match_commit', 'Match Commit', obs.OBS_TEXT_DEFAULT)
@@ -499,6 +503,8 @@ else:
 
         obs.obs_data_set_default_string(settings, 'match_load', 'Match Load')
         obs.obs_data_set_default_string(settings, 'show_preview', 'Show Preview')
+        obs.obs_data_set_default_string(settings, 'show_random', 'Show Random')
+        obs.obs_data_set_default_string(settings, 'show_match', 'Show Match')
         obs.obs_data_set_default_string(settings, 'match_start', 'Match Start')
         obs.obs_data_set_default_string(settings, 'match_abort', 'Match Abort')
         obs.obs_data_set_default_string(settings, 'match_commit', 'Match Commit')
@@ -695,7 +701,12 @@ else:
                 else:
                     # check websocket for events
                     msg = comm.get_nowait()
-                    scene = msg_mapping[msg['updateType']]
+                    try:
+                        scene = msg_mapping[msg['updateType']]
+                    except KeyError:
+                        print(f'WARNING: Unknown WS match event type {msg["updateType"]}')
+                        print()
+                        continue
 
                 # bail if not currently on a recognized scene
                 if not obs.obs_data_get_bool(settings, 'override_non_match_scenes') and obs.obs_source_get_name(obs.obs_frontend_get_current_scene()) not in map(lambda scene: obs.obs_data_get_string(settings, scene), msg_mapping.values()):
@@ -724,15 +735,8 @@ else:
                     # stop recording last match if it is still recording
                     if obs.obs_output_active(output):
                         stop_recording_and_upload()
-                elif scene == 'show_preview':
-                    # stop recording last match if it is still recording
-                    if obs.obs_output_active(output):
-                        stop_recording_and_upload()
-
-                    if obs.obs_data_get_bool(settings, 'switcher_recording'):
-                        start_recording()
-                elif scene == 'match_start':
-                    # start recording if it wasn't started with preview (e.g. match was aborted and restarted without re-previewing)
+                elif scene in ['show_preview', 'show_random', 'show_match', 'match_start']:
+                    # start recording if not already recording (e.g. if preview or match was shown more than once)
                     if obs.obs_data_get_bool(settings, 'switcher_recording') and not obs.obs_output_active(output):
                         start_recording()
                 elif scene == 'match_post':
