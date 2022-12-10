@@ -439,6 +439,17 @@ else:
         recording_props = obs.obs_properties_create()
         obs.obs_properties_add_group(props, 'recording', 'Recording', obs.OBS_GROUP_NORMAL, recording_props)
 
+        output_resolution_prop = obs.obs_properties_add_list(recording_props, 'output_resolution', 'Output Resolution', obs.OBS_COMBO_TYPE_EDITABLE, obs.OBS_COMBO_FORMAT_STRING)
+        recording_output = obs.obs_frontend_get_recording_output()
+        recording_width, recording_height = obs.obs_output_get_width(recording_output), obs.obs_output_get_height(recording_output)
+        obs.obs_property_list_add_string(output_resolution_prop, f'{recording_width}x{recording_height}', f'{recording_width}x{recording_height}')
+        canvas_video = obs.obs_get_video()
+        canvas_width, canvas_height = obs.video_output_get_width(canvas_video), obs.video_output_get_height(canvas_video)
+        if canvas_width != recording_width or canvas_height != recording_height:
+            obs.obs_property_list_add_string(output_resolution_prop, f'{canvas_width}x{canvas_height}', f'{canvas_width}x{canvas_height}')
+        obs.obs_property_list_add_string(output_resolution_prop, '1920x1080', '1920x1080')
+        obs.obs_property_list_add_string(output_resolution_prop, '1280x720', '1280x720')
+
         video_encoder_prop = obs.obs_properties_add_list(recording_props, 'video_encoder', 'Video Encoder (H.264)', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
         obs.obs_property_list_add_string(video_encoder_prop, 'x264', 'obs_x264')
         if obs.obs_encoder_get_display_name('jim_nvenc'):
@@ -511,6 +522,9 @@ else:
         obs.obs_data_set_default_string(settings, 'match_post', 'Match Post')
         obs.obs_data_set_default_string(settings, 'match_wait', 'Match Wait')
 
+        recording_output = obs.obs_frontend_get_recording_output()
+        recording_width, recording_height = obs.obs_output_get_width(recording_output), obs.obs_output_get_height(recording_output)
+        obs.obs_data_set_default_string(settings, 'output_resolution', f'{recording_width}x{recording_height}')
         obs.obs_data_set_default_string(settings, 'video_encoder', 'obs_x264')
         obs.obs_data_set_default_int(settings, 'video_bitrate', 2500)
         obs.obs_data_set_default_string(settings, 'audio_encoder', 'ffmpeg_aac')
@@ -592,6 +606,14 @@ else:
             print(f'ERROR: Invalid codec for match video encoder')
             destroy_match_video_output()
             return
+        output_video_resolution = re.fullmatch(r'\d{1,5}x\d{1,5}', obs.obs_data_get_string(settings, 'output_resolution'))
+        if output_video_resolution:
+            output_video_width, output_video_height = output_video_resolution.groups()
+            if output_video_width < 8 or output_video_width > 16384 or output_video_height < 8 or output_video_height > 16384:
+                print(f'ERROR: Invalid resolution for match video encoder')
+                destroy_match_video_output()
+                return
+            obs.obs_encoder_set_scaled_size(output_video_encoder, output_video_width, output_video_height)
         obs.obs_encoder_set_video(output_video_encoder, obs.obs_get_video())
         if not obs.obs_encoder_video(output_video_encoder):
             print(f'ERROR: Could not set video handler')
