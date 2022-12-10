@@ -446,8 +446,12 @@ else:
         canvas_width, canvas_height = obs.obs_source_get_width(canvas_source), obs.obs_source_get_height(canvas_source)
         obs.obs_source_release(canvas_source)
         output_resolution_options.add(f'{canvas_width}x{canvas_height}')
-        for resolution in output_resolution_options:
-            obs.obs_property_list_add_string(output_resolution_prop, resolution, resolution)
+        try:
+            for resolution in sorted(output_resolution_options, key=lambda res: int(res.split('x', 1)[0]), reverse=True):
+                obs.obs_property_list_add_string(output_resolution_prop, resolution, resolution)
+        except ValueError:
+            print(f'ERROR: Resolution options are malformed')
+            print()
 
         video_encoder_prop = obs.obs_properties_add_list(recording_props, 'video_encoder', 'Video Encoder (H.264)', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
         obs.obs_property_list_add_string(video_encoder_prop, 'x264', 'obs_x264')
