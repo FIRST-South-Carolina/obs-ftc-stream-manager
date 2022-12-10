@@ -235,6 +235,7 @@ else:
     import os
     import os.path
     import queue
+    import re
     import subprocess
     import sys
     import tempfile
