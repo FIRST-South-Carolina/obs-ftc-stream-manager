@@ -443,8 +443,9 @@ else:
         recording_output = obs.obs_frontend_get_recording_output()
         recording_width, recording_height = obs.obs_output_get_width(recording_output), obs.obs_output_get_height(recording_output)
         obs.obs_property_list_add_string(output_resolution_prop, f'{recording_width}x{recording_height}', f'{recording_width}x{recording_height}')
-        canvas_video = obs.obs_get_video()
-        canvas_width, canvas_height = obs.video_output_get_width(canvas_video), obs.video_output_get_height(canvas_video)
+        canvas_source = obs.obs_frontend_get_current_scene()
+        canvas_width, canvas_height = obs.obs_source_get_width(canvas_source), obs.obs_source_get_width(canvas_source)
+        obs.obs_source_release(canvas_source)
         if canvas_width != recording_width or canvas_height != recording_height:
             obs.obs_property_list_add_string(output_resolution_prop, f'{canvas_width}x{canvas_height}', f'{canvas_width}x{canvas_height}')
         obs.obs_property_list_add_string(output_resolution_prop, '1920x1080', '1920x1080')
@@ -752,7 +753,10 @@ else:
                         stop_recording_and_cancel()
 
                 # bail if not currently on a recognized scene
-                if not obs.obs_data_get_bool(settings, 'override_non_match_scenes') and obs.obs_source_get_name(obs.obs_frontend_get_current_scene()) not in map(lambda scene: obs.obs_data_get_string(settings, scene), msg_mapping.values()):
+                current_scene = obs.obs_frontend_get_current_scene()
+                current_scene_name = obs.obs_source_get_name()
+                obs.obs_source_release(current_scene)
+                if not obs.obs_data_get_bool(settings, 'override_non_match_scenes') and current_scene_name not in map(lambda scene: obs.obs_data_get_string(settings, scene), msg_mapping.values()):
                     print(f'WARNING: Ignoring scorekeeper event because the current scene is unrecognized and overriding unrecognized scenes is disabled')
                     print()
                     continue
