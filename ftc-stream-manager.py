@@ -608,8 +608,11 @@ else:
             return
         output_video_resolution = re.fullmatch(r'(\d{1,5})x(\d{1,5})', obs.obs_data_get_string(settings, 'output_resolution'))
         if output_video_resolution:
-            output_video_width, output_video_height = output_video_resolution.groups()
-            if output_video_width < 8 or output_video_width > 16384 or output_video_height < 8 or output_video_height > 16384:
+            try:
+                output_video_width, output_video_height = map(int, output_video_resolution.groups())
+                if output_video_width < 8 or output_video_width > 16384 or output_video_height < 8 or output_video_height > 16384:
+                    raise ValueError()
+            except ValueError:
                 print(f'ERROR: Invalid resolution for match video encoder')
                 destroy_match_video_output()
                 return
