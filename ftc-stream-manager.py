@@ -441,16 +441,13 @@ else:
         obs.obs_properties_add_group(props, 'recording', 'Recording', obs.OBS_GROUP_NORMAL, recording_props)
 
         output_resolution_prop = obs.obs_properties_add_list(recording_props, 'output_resolution', 'Output Resolution', obs.OBS_COMBO_TYPE_EDITABLE, obs.OBS_COMBO_FORMAT_STRING)
-        recording_output = obs.obs_frontend_get_recording_output()
-        recording_width, recording_height = obs.obs_output_get_width(recording_output), obs.obs_output_get_height(recording_output)
-        obs.obs_property_list_add_string(output_resolution_prop, f'{recording_width}x{recording_height}', f'{recording_width}x{recording_height}')
+        output_resolution_options = {'1920x1080', '1280x720'}
         canvas_source = obs.obs_frontend_get_current_scene()
-        canvas_width, canvas_height = obs.obs_source_get_width(canvas_source), obs.obs_source_get_width(canvas_source)
+        canvas_width, canvas_height = obs.obs_source_get_width(canvas_source), obs.obs_source_get_height(canvas_source)
         obs.obs_source_release(canvas_source)
-        if canvas_width != recording_width or canvas_height != recording_height:
-            obs.obs_property_list_add_string(output_resolution_prop, f'{canvas_width}x{canvas_height}', f'{canvas_width}x{canvas_height}')
-        obs.obs_property_list_add_string(output_resolution_prop, '1920x1080', '1920x1080')
-        obs.obs_property_list_add_string(output_resolution_prop, '1280x720', '1280x720')
+        output_resolution_options.add(f'{canvas_width}x{canvas_height}')
+        for resolution in output_resolution_options:
+            obs.obs_property_list_add_string(output_resolution_prop, resolution, resolution)
 
         video_encoder_prop = obs.obs_properties_add_list(recording_props, 'video_encoder', 'Video Encoder (H.264)', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
         obs.obs_property_list_add_string(video_encoder_prop, 'x264', 'obs_x264')
@@ -524,9 +521,10 @@ else:
         obs.obs_data_set_default_string(settings, 'match_post', 'Match Post')
         obs.obs_data_set_default_string(settings, 'match_wait', 'Match Wait')
 
-        recording_output = obs.obs_frontend_get_recording_output()
-        recording_width, recording_height = obs.obs_output_get_width(recording_output), obs.obs_output_get_height(recording_output)
-        obs.obs_data_set_default_string(settings, 'output_resolution', f'{recording_width}x{recording_height}')
+        canvas_source = obs.obs_frontend_get_current_scene()
+        canvas_width, canvas_height = obs.obs_source_get_width(canvas_source), obs.obs_source_get_height(canvas_source)
+        obs.obs_source_release(canvas_source)
+        obs.obs_data_set_default_string(settings, 'output_resolution', f'{canvas_width}x{canvas_height}')
         obs.obs_data_set_default_string(settings, 'video_encoder', 'obs_x264')
         obs.obs_data_set_default_int(settings, 'video_bitrate', 2500)
         obs.obs_data_set_default_string(settings, 'audio_encoder', 'ffmpeg_aac')
