@@ -708,26 +708,6 @@ else:
                         print()
                         continue
 
-                # bail if not currently on a recognized scene
-                if not obs.obs_data_get_bool(settings, 'override_non_match_scenes') and obs.obs_source_get_name(obs.obs_frontend_get_current_scene()) not in map(lambda scene: obs.obs_data_get_string(settings, scene), msg_mapping.values()):
-                    print(f'WARNING: Ignoring scorekeeper event because the current scene is unrecognized and overriding unrecognized scenes is disabled')
-                    print()
-                    continue
-
-                print(f'Switching scene to {obs.obs_data_get_string(settings, scene)}')
-                print()
-
-                # find and set the current scene based on websocket or wait set above
-                sources = obs.obs_frontend_get_scenes()
-                for source in sources:
-                    if obs.obs_source_get_name(source) == obs.obs_data_get_string(settings, scene):
-                        obs.obs_frontend_set_current_scene(source)
-                        break
-                else:
-                    print(f'WARNING: Could not find scene {obs.obs_data_get_string(settings, scene)}')
-                    print()
-                obs.source_list_release(sources)
-
                 # reset match post time (it gets overwritten again in conditional if transitioning to match_wait)
                 post_time = -1
 
@@ -748,6 +728,26 @@ else:
                 elif scene == 'match_abort':
                     if obs.obs_output_active(output):
                         stop_recording_and_cancel()
+
+                # bail if not currently on a recognized scene
+                if not obs.obs_data_get_bool(settings, 'override_non_match_scenes') and obs.obs_source_get_name(obs.obs_frontend_get_current_scene()) not in map(lambda scene: obs.obs_data_get_string(settings, scene), msg_mapping.values()):
+                    print(f'WARNING: Ignoring scorekeeper event because the current scene is unrecognized and overriding unrecognized scenes is disabled')
+                    print()
+                    continue
+
+                print(f'Switching scene to {obs.obs_data_get_string(settings, scene)}')
+                print()
+
+                # find and set the current scene based on websocket or wait set above
+                sources = obs.obs_frontend_get_scenes()
+                for source in sources:
+                    if obs.obs_source_get_name(source) == obs.obs_data_get_string(settings, scene):
+                        obs.obs_frontend_set_current_scene(source)
+                        break
+                else:
+                    print(f'WARNING: Could not find scene {obs.obs_data_get_string(settings, scene)}')
+                    print()
+                obs.source_list_release(sources)
         except queue.Empty:
             pass
 
