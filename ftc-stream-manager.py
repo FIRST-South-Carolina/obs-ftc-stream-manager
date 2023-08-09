@@ -760,7 +760,7 @@ else:
 
                 # bail if not currently on a recognized scene
                 current_scene = obs.obs_frontend_get_current_scene()
-                current_scene_name = obs.obs_source_get_name()
+                current_scene_name = obs.obs_source_get_name(current_scene)
                 obs.obs_source_release(current_scene)
                 if not obs.obs_data_get_bool(settings, 'override_non_match_scenes') and current_scene_name not in map(lambda scene: obs.obs_data_get_string(settings, scene), msg_mapping.values()):
                     print(f'WARNING: Ignoring scorekeeper event because the current scene is unrecognized and overriding unrecognized scenes is disabled')
