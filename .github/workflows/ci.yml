@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v3
+
+      - run: pip install -U --upgrade-strategy eager wheel google-api-python-client google-auth-oauthlib websockets pylint
+
+      - run: pylint --rcfile=.pylintrc ftc_stream_manager.py
