@@ -49,7 +49,7 @@ if obs is None:
             }
             flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_config(client_config, ['https://www.googleapis.com/auth/youtubepartner'])
             credentials = flow.run_local_server()
-            with open(os.path.join(os.path.dirname(__file__), 'ftc-match-uploader-token.json'), 'w') as token:
+            with open(os.path.join(os.path.dirname(__file__), 'ftc-match-uploader-token.json'), 'w', encoding='utf-8') as token:
                 token.write(credentials.to_json())
 
         return googleapiclient.discovery.build('youtube', 'v3', credentials=credentials)
@@ -61,7 +61,7 @@ if obs is None:
         get_youtube_api(google_project_id, google_client_id, google_client_secret)
 
 
-    def delete_credentials(google_project_id, google_client_id, google_client_secret):
+    def delete_credentials(_google_project_id, _google_client_id, _google_client_secret):
         print(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Deleting stored credentials', file=sys.stderr)
 
         try:
@@ -94,7 +94,7 @@ if obs is None:
             },
         }
 
-        request = youtube.videos().insert(
+        request = youtube.videos().insert(  # pylint: disable=no-member
             part=','.join(request_body.keys()),
             body=request_body,
             media_body=googleapiclient.http.MediaFileUpload(path, chunksize=-1, resumable=True),
@@ -105,19 +105,19 @@ if obs is None:
         response = None
         while response is None:
             try:
-                status, response = request.next_chunk()
-            except googleapiclient.errors.HttpError as e:
-                if e.resp.status in [500, 502, 503, 504]:
+                _status, response = request.next_chunk()
+            except googleapiclient.errors.HttpError as err:
+                if err.resp.status in [500, 502, 503, 504]:
                     if tries >= 10:
-                        raise RuntimeError(f'YouTube upload failed after {tries} tries with status code {e.resp.status}')
+                        raise RuntimeError(f'YouTube upload failed after {tries} tries with status code {err.resp.status}') from err
 
                     time.sleep(random.randint(1, 2 ** tries))
                     tries += 1
                 else:
                     raise
-            except (httplib2.HttpLib2Error, IOError, http.client.NotConnected, http.client.IncompleteRead, http.client.ImproperConnectionState, http.client.CannotSendRequest, http.client.CannotSendHeader, http.client.ResponseNotReady, http.client.BadStatusLine) as e:
+            except (httplib2.HttpLib2Error, IOError, http.client.NotConnected, http.client.IncompleteRead, http.client.ImproperConnectionState, http.client.CannotSendRequest, http.client.CannotSendHeader, http.client.ResponseNotReady, http.client.BadStatusLine) as err:
                 if tries >= 10:
-                    raise RuntimeError(f'YouTube upload failed after {tries} tries with error: {e}')
+                    raise RuntimeError(f'YouTube upload failed after {tries} tries with error: {err}') from err
 
                 time.sleep(random.randint(1, 2 ** tries))
                 tries += 1
@@ -144,7 +144,7 @@ if obs is None:
                 },
             }
 
-            request = youtube.playlistItems().insert(
+            request = youtube.playlistItems().insert(  # pylint: disable=no-member
                 part=','.join(request_body.keys()),
                 body=request_body,
             )
@@ -156,8 +156,8 @@ if obs is None:
                     print(f'  YouTube Playlist Item ID: {response["id"]}', file=sys.stderr)
                 else:
                     print(f'  YouTube playlist insert failed with unexpected response: {response}', file=sys.stderr)
-            except googleapiclient.errors.HttpError as e:
-                print(f'  YouTube playlist insert failed with status code {e.resp.status}', file=sys.stderr)
+            except googleapiclient.errors.HttpError as err:
+                print(f'  YouTube playlist insert failed with status code {err.resp.status}', file=sys.stderr)
         else:
             print(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Not adding to a playlist', file=sys.stderr)
 
@@ -184,13 +184,13 @@ if obs is None:
 
                 if response_code != 200:
                     print(f'  The Orange Alliance match video update failed with unexpected status code {response_code} and response: {response}', file=sys.stderr)
-            except urllib.error.HTTPError as e:
-                print(f'  The Orange Alliance match video update failed with status code {e.code}', file=sys.stderr)
+            except urllib.error.HTTPError as err:
+                print(f'  The Orange Alliance match video update failed with status code {err.code}', file=sys.stderr)
 
         try:
             os.remove(path)
-        except OSError:
-            raise RuntimeError(f'Error removing video file: {path}')
+        except OSError as err:
+            raise RuntimeError(f'Error removing video file: {path}') from err
 
 
     commands = {
@@ -209,7 +209,7 @@ if obs is None:
         sys.exit(1)
 
     try:
-        with open(sys.argv[2], 'r') as f:
+        with open(sys.argv[2], 'r', encoding='utf-8') as f:
             metadata = json.load(f)
     except (OSError, ValueError):
         print(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Error reading metadata file: {sys.argv[2]}', file=sys.stderr)
@@ -217,7 +217,7 @@ if obs is None:
 
     try:
         commands[sys.argv[1]](**metadata)
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         import traceback
         print(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Exception occurred for command "{sys.argv[1]}":', file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
@@ -244,7 +244,7 @@ else:
     import urllib.error
     import urllib.request
 
-    import websockets
+    import websockets.client
 
 
     if sys.platform == 'win32':
@@ -253,20 +253,20 @@ else:
         python_path = os.path.join(sys.exec_prefix, 'bin', 'python3')
 
 
-    settings = None
-    hotkeys = {}
-    thread = None
+    settings = None  # pylint: disable=invalid-name
+    hotkeys = {}  # pylint: disable=invalid-name
+    thread = None  # pylint: disable=invalid-name
 
-    comm = None
-    stop = None
+    comm = None  # pylint: disable=invalid-name
+    stop = None  # pylint: disable=invalid-name
 
-    output = None
-    output_video_encoder = None
-    output_audio_encoder = None
-    action = 'none'
+    output = None  # pylint: disable=invalid-name
+    output_video_encoder = None  # pylint: disable=invalid-name
+    output_audio_encoder = None  # pylint: disable=invalid-name
+    action = 'none'  # pylint: disable=invalid-name
     children = []
 
-    post_time = -1
+    post_time = -1  # pylint: disable=invalid-name
 
     msg_mapping = {
         'MATCH_LOAD': 'match_load',
@@ -287,7 +287,7 @@ else:
 
 
     def script_load(settings_):
-        global settings, comm, stop
+        global settings, comm, stop  # pylint: disable=invalid-name
 
         settings = settings_
 
@@ -339,8 +339,6 @@ else:
 
 
     def script_unload():
-        global thread
-
         obs.timer_remove(check_children)
 
         # stop websocket thread
@@ -353,7 +351,7 @@ else:
         destroy_match_video_output()
 
 
-    def script_save(settings):
+    def script_save(settings_):
         # save hotkey data
         hotkey_start = obs.obs_hotkey_save(hotkeys['start'])
         hotkey_stop = obs.obs_hotkey_save(hotkeys['stop'])
@@ -362,11 +360,11 @@ else:
         hotkey_disable = obs.obs_hotkey_save(hotkeys['disable'])
 
         # set hotkey data
-        obs.obs_data_set_array(settings, 'hotkey_start', hotkey_start)
-        obs.obs_data_set_array(settings, 'hotkey_stop', hotkey_stop)
-        obs.obs_data_set_array(settings, 'hotkey_cancel', hotkey_cancel)
-        obs.obs_data_set_array(settings, 'hotkey_enable', hotkey_enable)
-        obs.obs_data_set_array(settings, 'hotkey_disable', hotkey_disable)
+        obs.obs_data_set_array(settings_, 'hotkey_start', hotkey_start)
+        obs.obs_data_set_array(settings_, 'hotkey_stop', hotkey_stop)
+        obs.obs_data_set_array(settings_, 'hotkey_cancel', hotkey_cancel)
+        obs.obs_data_set_array(settings_, 'hotkey_enable', hotkey_enable)
+        obs.obs_data_set_array(settings_, 'hotkey_disable', hotkey_disable)
 
         # release data references
         obs.obs_data_array_release(hotkey_start)
@@ -492,56 +490,56 @@ else:
         return props
 
 
-    def script_defaults(settings):
-        obs.obs_data_set_default_string(settings, 'event_name', 'FTC Test Event')
-        obs.obs_data_set_default_string(settings, 'youtube_description', 'Testing FTC video cutting and uploading during a stream')
-        obs.obs_data_set_default_string(settings, 'youtube_category_id', '28')
-        obs.obs_data_set_default_string(settings, 'youtube_privacy_status', 'private')
-        obs.obs_data_set_default_string(settings, 'youtube_playlist', '')
+    def script_defaults(settings_):
+        obs.obs_data_set_default_string(settings_, 'event_name', 'FTC Test Event')
+        obs.obs_data_set_default_string(settings_, 'youtube_description', 'Testing FTC video cutting and uploading during a stream')
+        obs.obs_data_set_default_string(settings_, 'youtube_category_id', '28')
+        obs.obs_data_set_default_string(settings_, 'youtube_privacy_status', 'private')
+        obs.obs_data_set_default_string(settings_, 'youtube_playlist', '')
 
-        obs.obs_data_set_default_string(settings, 'event_code', 'ftc_test')
-        obs.obs_data_set_default_string(settings, 'scorekeeper_api', 'http://localhost/api')
-        obs.obs_data_set_default_string(settings, 'scorekeeper_ws', 'ws://localhost/api/v2/stream/')
+        obs.obs_data_set_default_string(settings_, 'event_code', 'ftc_test')
+        obs.obs_data_set_default_string(settings_, 'scorekeeper_api', 'http://localhost/api')
+        obs.obs_data_set_default_string(settings_, 'scorekeeper_ws', 'ws://localhost/api/v2/stream/')
 
-        obs.obs_data_set_default_string(settings, 'toa_key', '')
-        obs.obs_data_set_default_string(settings, 'toa_event', '')
+        obs.obs_data_set_default_string(settings_, 'toa_key', '')
+        obs.obs_data_set_default_string(settings_, 'toa_event', '')
 
-        obs.obs_data_set_default_string(settings, 'google_project_id', '')
-        obs.obs_data_set_default_string(settings, 'google_client_id', '')
-        obs.obs_data_set_default_string(settings, 'google_client_secret', '')
+        obs.obs_data_set_default_string(settings_, 'google_project_id', '')
+        obs.obs_data_set_default_string(settings_, 'google_client_id', '')
+        obs.obs_data_set_default_string(settings_, 'google_client_secret', '')
 
-        obs.obs_data_set_default_bool(settings, 'switcher_enabled', True)
-        obs.obs_data_set_default_bool(settings, 'switcher_recording', True)
-        obs.obs_data_set_default_bool(settings, 'override_non_match_scenes', False)
-        obs.obs_data_set_default_int(settings, 'match_wait_time', 30)
+        obs.obs_data_set_default_bool(settings_, 'switcher_enabled', True)
+        obs.obs_data_set_default_bool(settings_, 'switcher_recording', True)
+        obs.obs_data_set_default_bool(settings_, 'override_non_match_scenes', False)
+        obs.obs_data_set_default_int(settings_, 'match_wait_time', 30)
 
-        obs.obs_data_set_default_string(settings, 'match_load', 'Match Load')
-        obs.obs_data_set_default_string(settings, 'show_preview', 'Show Preview')
-        obs.obs_data_set_default_string(settings, 'show_random', 'Show Random')
-        obs.obs_data_set_default_string(settings, 'show_match', 'Show Match')
-        obs.obs_data_set_default_string(settings, 'match_start', 'Match Start')
-        obs.obs_data_set_default_string(settings, 'match_abort', 'Match Abort')
-        obs.obs_data_set_default_string(settings, 'match_commit', 'Match Commit')
-        obs.obs_data_set_default_string(settings, 'match_post', 'Match Post')
-        obs.obs_data_set_default_string(settings, 'match_wait', 'Match Wait')
+        obs.obs_data_set_default_string(settings_, 'match_load', 'Match Load')
+        obs.obs_data_set_default_string(settings_, 'show_preview', 'Show Preview')
+        obs.obs_data_set_default_string(settings_, 'show_random', 'Show Random')
+        obs.obs_data_set_default_string(settings_, 'show_match', 'Show Match')
+        obs.obs_data_set_default_string(settings_, 'match_start', 'Match Start')
+        obs.obs_data_set_default_string(settings_, 'match_abort', 'Match Abort')
+        obs.obs_data_set_default_string(settings_, 'match_commit', 'Match Commit')
+        obs.obs_data_set_default_string(settings_, 'match_post', 'Match Post')
+        obs.obs_data_set_default_string(settings_, 'match_wait', 'Match Wait')
 
         canvas_source = obs.obs_frontend_get_current_scene()
         canvas_width, canvas_height = obs.obs_source_get_width(canvas_source), obs.obs_source_get_height(canvas_source)
         obs.obs_source_release(canvas_source)
-        obs.obs_data_set_default_string(settings, 'output_resolution', f'{canvas_width}x{canvas_height}')
-        obs.obs_data_set_default_string(settings, 'video_encoder', 'obs_x264')
-        obs.obs_data_set_default_int(settings, 'video_bitrate', 2500)
-        obs.obs_data_set_default_string(settings, 'audio_encoder', 'ffmpeg_aac')
-        obs.obs_data_set_default_int(settings, 'audio_bitrate', 192)
+        obs.obs_data_set_default_string(settings_, 'output_resolution', f'{canvas_width}x{canvas_height}')
+        obs.obs_data_set_default_string(settings_, 'video_encoder', 'obs_x264')
+        obs.obs_data_set_default_int(settings_, 'video_bitrate', 2500)
+        obs.obs_data_set_default_string(settings_, 'audio_encoder', 'ffmpeg_aac')
+        obs.obs_data_set_default_int(settings_, 'audio_bitrate', 192)
 
-        obs.obs_data_set_default_string(settings, 'match_type', 'qualification')
-        obs.obs_data_set_default_int(settings, 'match_pair', 1)
-        obs.obs_data_set_default_int(settings, 'match_number', 1)
-        obs.obs_data_set_default_int(settings, 'match_code', 1)
+        obs.obs_data_set_default_string(settings_, 'match_type', 'qualification')
+        obs.obs_data_set_default_int(settings_, 'match_pair', 1)
+        obs.obs_data_set_default_int(settings_, 'match_number', 1)
+        obs.obs_data_set_default_int(settings_, 'match_code', 1)
 
 
     def connect_scorekeeper_websocket():
-        global thread
+        global thread  # pylint: disable=invalid-name
 
         print(f'Connecting to scorekeeper WS')
 
@@ -559,7 +557,7 @@ else:
 
 
     def disconnect_scorekeeper_websocket():
-        global thread
+        global thread  # pylint: disable=invalid-name
 
         print(f'Disconnecting from scorekeeper WS')
 
@@ -577,7 +575,7 @@ else:
 
 
     def create_match_video_output():
-        global output, output_video_encoder, output_audio_encoder
+        global output, output_video_encoder, output_audio_encoder  # pylint: disable=invalid-name
 
         print(f'Creating match video OBS output')
 
@@ -665,7 +663,7 @@ else:
 
 
     def destroy_match_video_output():
-        global output, output_video_encoder, output_audio_encoder
+        global output, output_video_encoder, output_audio_encoder  # pylint: disable=invalid-name
 
         print(f'Destroying match video OBS output')
 
@@ -693,7 +691,7 @@ else:
 
                 if child.returncode != 0:
                     print(f'ERROR: Subprocess exited with code {child.returncode}: {child.args}')
-                    with open(log, 'r') as logf:
+                    with open(log, 'r', encoding='utf-8') as logf:
                         print('\n'.join(f'  {line}' for line in logf.read().splitlines()))
                     print()
                 try:
@@ -706,7 +704,7 @@ else:
 
 
     def check_websocket():
-        global thread, post_time
+        global thread, post_time  # pylint: disable=invalid-name
 
         if not obs.obs_data_get_bool(settings, 'switcher_enabled'):
             return
@@ -785,18 +783,14 @@ else:
 
 
     async def run_websocket(uri):
-        try:
-            async with websockets.connect(uri) as websocket:
-                # thread kill-switch check
-                while not stop.is_set():
-                    try:
-                        # try to get something from websocket and put it in queue for main thread (dropping events when queue is full)
-                        comm.put_nowait(json.loads(await asyncio.wait_for(websocket.recv(), 0.2)))
-                    except (asyncio.TimeoutError, queue.Full):
-                        pass
-        except Exception as err:
-            # errors will be detected and reported in main thread
-            raise
+        async with websockets.client.connect(uri) as websocket:
+            # thread kill-switch check
+            while not stop.is_set():
+                try:
+                    # try to get something from websocket and put it in queue for main thread (dropping events when queue is full)
+                    comm.put_nowait(json.loads(await asyncio.wait_for(websocket.recv(), 0.2)))
+                except (asyncio.TimeoutError, queue.Full):
+                    pass
 
 
     def get_match_name():
@@ -811,7 +805,7 @@ else:
             return f'Match {obs.obs_data_get_int(settings, "match_number")}'
 
 
-    def reset_match_info(prop=None, props=None):
+    def reset_match_info(_prop=None, _props=None):
         obs.obs_data_set_string(settings, 'match_type', 'qualification')
         obs.obs_data_set_int(settings, 'match_pair', 1)
         obs.obs_data_set_int(settings, 'match_number', 1)
@@ -821,14 +815,14 @@ else:
         print()
 
 
-    def test_scorekeeper_connection(prop=None, props=None):
+    def test_scorekeeper_connection(_prop=None, _props=None):
         try:
             with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/', timeout=1) as scorekeeper:
                 scorekeeper_code = scorekeeper.getcode()
                 event_code = json.load(scorekeeper)['eventCode']
-        except urllib.error.HTTPError as e:
-            scorekeeper_code = e.code
-        except Exception:
+        except urllib.error.HTTPError as err:
+            scorekeeper_code = err.code
+        except (IOError, KeyError):
             scorekeeper_code = -1
 
         if scorekeeper_code == 200 and event_code == obs.obs_data_get_string(settings, 'event_code'):
@@ -843,14 +837,14 @@ else:
         print()
 
 
-    def reconnect_scorekeeper_ws(prop=None, props=None):
+    def reconnect_scorekeeper_ws(_prop=None, _props=None):
         if thread and thread.is_alive():
             disconnect_scorekeeper_websocket()
         if obs.obs_data_get_bool(settings, 'switcher_enabled'):
             connect_scorekeeper_websocket()
 
 
-    def refresh_google_authentication(prop=None, props=None):
+    def refresh_google_authentication(_prop=None, _props=None):
         print(f'Refreshing Google authentication')
 
         if not obs.obs_data_get_string(settings, 'google_project_id') or not obs.obs_data_get_string(settings, 'google_client_id') or not obs.obs_data_get_string(settings, 'google_client_secret'):
@@ -873,14 +867,14 @@ else:
 
         print(f'  Log Path: {log_path}')
 
-        children.append((subprocess.Popen([python_path, __file__, 'refresh', metadata_path], stdin=subprocess.DEVNULL, stdout=log_fd, stderr=subprocess.STDOUT), log_path))
+        children.append((subprocess.Popen([python_path, __file__, 'refresh', metadata_path], stdin=subprocess.DEVNULL, stdout=log_fd, stderr=subprocess.STDOUT), log_path))  # pylint: disable=consider-using-with
 
         os.close(log_fd)
 
         print()
 
 
-    def delete_google_authentication(prop=None, props=None):
+    def delete_google_authentication(_prop=None, _props=None):
         print(f'Deleting Google authentication')
 
         metadata_fd, metadata_path = tempfile.mkstemp(suffix='.json', text=True)
@@ -898,21 +892,21 @@ else:
 
         print(f'  Log Path: {log_path}')
 
-        children.append((subprocess.Popen([python_path, __file__, 'delete', metadata_path], stdin=subprocess.DEVNULL, stdout=log_fd, stderr=subprocess.STDOUT), log_path))
+        children.append((subprocess.Popen([python_path, __file__, 'delete', metadata_path], stdin=subprocess.DEVNULL, stdout=log_fd, stderr=subprocess.STDOUT), log_path))  # pylint: disable=consider-using-with
 
         os.close(log_fd)
 
         print()
 
 
-    def recreate_recording_output(prop=None, props=None):
+    def recreate_recording_output(_prop=None, _props=None):
         if output:
             destroy_match_video_output()
         create_match_video_output()
 
 
     def stop_recording_action(calldata):
-        global action
+        global action  # pylint: disable=invalid-name
 
         signal_output = obs.calldata_ptr(calldata, 'output')
         code = obs.calldata_int(calldata, 'code')
@@ -966,7 +960,7 @@ else:
 
             print(f'  Log Path: {log_path}')
 
-            children.append((subprocess.Popen([python_path, __file__, 'upload', metadata_path], stdin=subprocess.DEVNULL, stdout=log_fd, stderr=subprocess.STDOUT), log_path))
+            children.append((subprocess.Popen([python_path, __file__, 'upload', metadata_path], stdin=subprocess.DEVNULL, stdout=log_fd, stderr=subprocess.STDOUT), log_path))  # pylint: disable=consider-using-with
 
             os.close(log_fd)
 
@@ -990,7 +984,7 @@ else:
             print()
             return
 
-        match_fd, match_path = tempfile.mkstemp(suffix='.mkv')
+        _match_fd, match_path = tempfile.mkstemp(suffix='.mkv')
 
         output_settings = obs.obs_data_create()
         obs.obs_data_set_string(output_settings, 'path', f'{match_path}')
@@ -1032,14 +1026,14 @@ else:
                         obs.obs_data_set_int(settings, 'match_number', match_code)
 
                     obs.obs_data_set_int(settings, 'match_code', match_code)
-            except Exception:
+            except (IOError, KeyError):
                 print(f'WARNING: Failed to communicate with scorekeeper')
 
         print(f'Recording started for {get_match_name()}')
 
 
     def stop_recording_and_upload(pressed=False):
-        global action
+        global action  # pylint: disable=invalid-name
 
         if pressed:
             return
@@ -1057,7 +1051,7 @@ else:
 
 
     def stop_recording_and_cancel(pressed=False):
-        global action
+        global action  # pylint: disable=invalid-name
 
         if pressed:
             return
