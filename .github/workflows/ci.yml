@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v4
 
       - run: pip install -U --upgrade-strategy eager wheel google-api-python-client google-auth-oauthlib websockets pylint
 
