@@ -438,6 +438,7 @@ else:
         recording_props = obs.obs_properties_create()
         obs.obs_properties_add_group(props, 'recording', 'Recording', obs.OBS_GROUP_NORMAL, recording_props)
 
+        obs.obs_properties_add_path(recording_props, 'video_directory', 'Video Directory', obs.OBS_PATH_DIRECTORY)
         output_resolution_prop = obs.obs_properties_add_list(recording_props, 'output_resolution', 'Output Resolution', obs.OBS_COMBO_TYPE_EDITABLE, obs.OBS_COMBO_FORMAT_STRING)
         output_resolution_options = {'1920x1080', '1280x720'}
         canvas_source = obs.obs_frontend_get_current_scene()
@@ -523,6 +524,7 @@ else:
         obs.obs_data_set_default_string(settings_, 'match_post', 'Match Post')
         obs.obs_data_set_default_string(settings_, 'match_wait', 'Match Wait')
 
+        obs.obs_data_set_default_string(settings_, 'video_directory', tempfile.gettempdir())
         canvas_source = obs.obs_frontend_get_current_scene()
         canvas_width, canvas_height = obs.obs_source_get_width(canvas_source), obs.obs_source_get_height(canvas_source)
         obs.obs_source_release(canvas_source)
@@ -987,7 +989,7 @@ else:
             print()
             return
 
-        _match_fd, match_path = tempfile.mkstemp(suffix='.mkv')
+        _match_fd, match_path = tempfile.mkstemp(suffix='.mkv', prefix=get_match_name() + '_', dir=obs.obs_data_get_string(settings, 'video_directory'))
 
         output_settings = obs.obs_data_create()
         obs.obs_data_set_string(output_settings, 'path', f'{match_path}')
