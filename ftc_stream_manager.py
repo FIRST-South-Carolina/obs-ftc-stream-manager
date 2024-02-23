@@ -774,7 +774,8 @@ else:
                 sources = obs.obs_frontend_get_scenes()
                 for source in sources:
                     if obs.obs_source_get_name(source) == obs.obs_data_get_string(settings, scene):
-                        obs.obs_frontend_set_current_scene(source)
+                        if obs.obs_frontend_get_current_scene() != source:
+                            obs.obs_frontend_set_current_scene(source)
                         break
                 else:
                     print(f'WARNING: Could not find scene {obs.obs_data_get_string(settings, scene)}')
