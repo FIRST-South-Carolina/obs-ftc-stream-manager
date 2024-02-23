@@ -788,7 +788,10 @@ else:
             while not stop.is_set():
                 try:
                     # try to get something from websocket and put it in queue for main thread (dropping events when queue is full)
-                    comm.put_nowait(json.loads(await asyncio.wait_for(websocket.recv(), 0.2)))
+                    message = await asyncio.wait_for(websocket.recv(), 0.2)
+                    if message == "pong":
+                        continue
+                    comm.put_nowait(json.loads(message))
                 except (asyncio.TimeoutError, queue.Full):
                     pass
 
