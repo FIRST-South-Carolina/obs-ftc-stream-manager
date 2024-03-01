@@ -438,7 +438,7 @@ else:
         recording_props = obs.obs_properties_create()
         obs.obs_properties_add_group(props, 'recording', 'Recording', obs.OBS_GROUP_NORMAL, recording_props)
 
-        obs.obs_properties_add_path(recording_props, 'video_directory', 'Video Directory', obs.OBS_PATH_DIRECTORY)
+        obs.obs_properties_add_path(recording_props, 'video_directory', 'Video Directory', obs.OBS_PATH_DIRECTORY, None, None)
         output_resolution_prop = obs.obs_properties_add_list(recording_props, 'output_resolution', 'Output Resolution', obs.OBS_COMBO_TYPE_EDITABLE, obs.OBS_COMBO_FORMAT_STRING)
         output_resolution_options = {'1920x1080', '1280x720'}
         canvas_source = obs.obs_frontend_get_current_scene()
