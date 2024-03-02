@@ -766,13 +766,16 @@ else:
 
                 # ignore load events for non-active field
                 if scene == 'match_load' and match_field > 0 and match_field != obs.obs_data_get_int(settings, 'match_field'):
+                    print(f'WARNING: Ignoring match load event for non-active field')
+                    print()
                     continue
 
                 # reset match post time (it gets overwritten again in conditional if transitioning to match_wait)
                 post_time = -1
 
                 # set match info from websocket event
-                set_match_info(match_field, match_name, match_code)
+                if match_field > 0:
+                    set_match_info(match_field, match_name, match_code)
 
                 if scene == 'match_load':
                     # stop recording last match if it is still recording
@@ -883,7 +886,7 @@ else:
                 obs.obs_data_set_int(settings, 'match_pair', int(match_name[2]))
                 obs.obs_data_set_int(settings, 'match_number', int(match_name[4:]))
         else:
-            print(f'WARNING: Recording unknown match type "{match_name}"')
+            print(f'WARNING: Unknown match type "{match_name}"')
             obs.obs_data_set_int(settings, 'match_number', match_code)
 
         obs.obs_data_set_int(settings, 'match_code', match_code)
