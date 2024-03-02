@@ -750,24 +750,29 @@ else:
                 if obs.obs_data_get_int(settings, 'match_wait_time') >= 0 and post_time >= 0 and time.time() >= post_time + obs.obs_data_get_int(settings, 'match_wait_time'):
                     # still in match post timer has been reached - set to match wait
                     scene = 'match_wait'
-                    field = 0
+                    match_field = 0
                 else:
                     # check websocket for events
                     msg = comm.get_nowait()
                     try:
                         scene = msg_mapping[msg['updateType']]
-                        field = msg['payload']['field']
+                        match_field = msg['payload']['field']
+                        match_name = msg['payload']['shortName']
+                        match_code = msg['payload']['number']
                     except KeyError:
                         print(f'WARNING: Unknown WS match event type {msg["updateType"]}')
                         print()
                         continue
 
                 # ignore events for non-active field
-                if field > 0 and field != obs.obs_data_get_int(settings, 'match_field'):
+                if match_field > 0 and match_field != obs.obs_data_get_int(settings, 'match_field'):
                     continue
 
                 # reset match post time (it gets overwritten again in conditional if transitioning to match_wait)
                 post_time = -1
+
+                # set match info from websocket event
+                set_match_info(match_field, match_name, match_code)
 
                 if scene == 'match_load':
                     # stop recording last match if it is still recording
@@ -855,6 +860,33 @@ else:
 
         print(f'Match info reset')
         print()
+
+
+    def set_match_info(match_field, match_name, match_code):
+        obs.obs_data_set_int(settings, 'match_field', match_field)
+
+        if match_name[0] == 'Q':
+            obs.obs_data_set_string(settings, 'match_type', 'qualification')
+            obs.obs_data_set_int(settings, 'match_pair', 1)
+            obs.obs_data_set_int(settings, 'match_number', int(match_name[1:]))
+        elif match_name[0:2] == 'SF' or match_name[0] == 'F':
+            if obs.obs_data_get_string(settings, 'scorekeeper_api') and obs.obs_data_get_string(settings, 'event_code'):
+                with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/elim/all/', timeout=1) as elims:
+                    match_code = len(json.load(elims)['matchList']) + 1
+
+            if match_name[0] == 'F':
+                obs.obs_data_set_string(settings, 'match_type', 'final')
+                obs.obs_data_set_int(settings, 'match_pair', 1)
+                obs.obs_data_set_int(settings, 'match_number', int(match_name[2:]))
+            else:
+                obs.obs_data_set_string(settings, 'match_type', 'semi-final')
+                obs.obs_data_set_int(settings, 'match_pair', int(match_name[2]))
+                obs.obs_data_set_int(settings, 'match_number', int(match_name[4:]))
+        else:
+            print(f'WARNING: Recording unknown match type "{match_name}"')
+            obs.obs_data_set_int(settings, 'match_number', match_code)
+
+        obs.obs_data_set_int(settings, 'match_code', match_code)
 
 
     def test_scorekeeper_connection(_prop=None, _props=None):
@@ -1039,7 +1071,7 @@ else:
             print()
             return
 
-        if obs.obs_data_get_string(settings, 'scorekeeper_api') and obs.obs_data_get_string(settings, 'event_code'):
+        if obs.obs_data_get_string(settings, 'scorekeeper_api') and obs.obs_data_get_string(settings, 'event_code') and (not thread or not thread.is_alive()):
             try:
                 with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/matches/active/', timeout=1) as matches:
                     match_data = json.load(matches)['matches']
@@ -1049,29 +1081,7 @@ else:
                     match_name = match_data[-1]['matchName']
                     match_code = match_data[-1]['matchNumber']
 
-                    obs.obs_data_set_int(settings, 'match_field', match_field)
-
-                    if match_name[0] == 'Q':
-                        obs.obs_data_set_string(settings, 'match_type', 'qualification')
-                        obs.obs_data_set_int(settings, 'match_pair', 1)
-                        obs.obs_data_set_int(settings, 'match_number', int(match_name[1:]))
-                    elif match_name[0:2] == 'SF' or match_name[0] == 'F':
-                        with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/elim/all/', timeout=1) as elims:
-                            match_code = len(json.load(elims)['matchList']) + 1
-
-                        if match_name[0] == 'F':
-                            obs.obs_data_set_string(settings, 'match_type', 'final')
-                            obs.obs_data_set_int(settings, 'match_pair', 1)
-                            obs.obs_data_set_int(settings, 'match_number', int(match_name[2:]))
-                        else:
-                            obs.obs_data_set_string(settings, 'match_type', 'semi-final')
-                            obs.obs_data_set_int(settings, 'match_pair', int(match_name[2]))
-                            obs.obs_data_set_int(settings, 'match_number', int(match_name[4:]))
-                    else:
-                        print(f'WARNING: Recording unknown match type "{match_name}"')
-                        obs.obs_data_set_int(settings, 'match_number', match_code)
-
-                    obs.obs_data_set_int(settings, 'match_code', match_code)
+                    set_match_info(match_field, match_name, match_code)
             except (IOError, KeyError):
                 print(f'WARNING: Failed to communicate with scorekeeper')
 
