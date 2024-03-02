@@ -771,7 +771,7 @@ else:
                     continue
 
                 # reset match post time (it gets overwritten again in conditional if transitioning to match_wait)
-                if not obs.obs_output_active(output):
+                if scene == 'match_wait' or not obs.obs_output_active(output):
                     post_time = -1
 
                 # set match info from websocket event
