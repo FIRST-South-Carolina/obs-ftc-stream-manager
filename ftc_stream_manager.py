@@ -231,6 +231,7 @@ if obs is None:
 else:
     # implement OBS-side of the plugin
     import asyncio
+    import itertools
     import json
     import os
     import os.path
@@ -425,15 +426,25 @@ else:
         scene_props = obs.obs_properties_create()
         obs.obs_properties_add_group(props, 'scene', 'Scenes', obs.OBS_GROUP_NORMAL, scene_props)
 
-        obs.obs_properties_add_text(scene_props, 'match_load', 'Match Load', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(scene_props, 'show_preview', 'Show Preview', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(scene_props, 'show_random', 'Show Random', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(scene_props, 'show_match', 'Show Match', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(scene_props, 'match_start', 'Match Start', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(scene_props, 'match_abort', 'Match Abort', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(scene_props, 'match_commit', 'Match Commit', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(scene_props, 'match_post', 'Match Post', obs.OBS_TEXT_DEFAULT)
-        obs.obs_properties_add_text(scene_props, 'match_wait', 'Match Wait', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_load_f1', 'Match Load (Field 1)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'show_preview_f1', 'Show Preview (Field 1)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'show_random_f1', 'Show Random (Field 1)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'show_match_f1', 'Show Match (Field 1)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_start_f1', 'Match Start (Field 1)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_abort_f1', 'Match Abort (Field 1)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_commit_f1', 'Match Commit (Field 1)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_post_f1', 'Match Post (Field 1)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_wait_f1', 'Match Wait (Field 1)', obs.OBS_TEXT_DEFAULT)
+
+        obs.obs_properties_add_text(scene_props, 'match_load_f2', 'Match Load (Field 2)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'show_preview_f2', 'Show Preview (Field 2)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'show_random_f2', 'Show Random (Field 2)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'show_match_f2', 'Show Match (Field 2)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_start_f2', 'Match Start (Field 2)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_abort_f2', 'Match Abort (Field 2)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_commit_f2', 'Match Commit (Field 2)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_post_f2', 'Match Post (Field 2)', obs.OBS_TEXT_DEFAULT)
+        obs.obs_properties_add_text(scene_props, 'match_wait_f2', 'Match Wait (Field 2)', obs.OBS_TEXT_DEFAULT)
 
         recording_props = obs.obs_properties_create()
         obs.obs_properties_add_group(props, 'recording', 'Recording', obs.OBS_GROUP_NORMAL, recording_props)
@@ -482,6 +493,7 @@ else:
         obs.obs_property_list_add_string(match_type_prop, 'Qualification', 'qualification')
         obs.obs_property_list_add_string(match_type_prop, 'Semi-Final', 'semi-final')
         obs.obs_property_list_add_string(match_type_prop, 'Final', 'final')
+        obs.obs_properties_add_int(match_props, 'match_field', 'Match Field', 1, 2, 1)
         obs.obs_properties_add_int(match_props, 'match_pair', 'Match Pair', 1, 2, 1)
         obs.obs_properties_add_int(match_props, 'match_number', 'Match Number', 1, 1000, 1)
         obs.obs_properties_add_int(match_props, 'match_code', 'Match Code', 1, 1000, 1)
@@ -514,15 +526,25 @@ else:
         obs.obs_data_set_default_bool(settings_, 'override_non_match_scenes', False)
         obs.obs_data_set_default_int(settings_, 'match_wait_time', 30)
 
-        obs.obs_data_set_default_string(settings_, 'match_load', 'Match Load')
-        obs.obs_data_set_default_string(settings_, 'show_preview', 'Show Preview')
-        obs.obs_data_set_default_string(settings_, 'show_random', 'Show Random')
-        obs.obs_data_set_default_string(settings_, 'show_match', 'Show Match')
-        obs.obs_data_set_default_string(settings_, 'match_start', 'Match Start')
-        obs.obs_data_set_default_string(settings_, 'match_abort', 'Match Abort')
-        obs.obs_data_set_default_string(settings_, 'match_commit', 'Match Commit')
-        obs.obs_data_set_default_string(settings_, 'match_post', 'Match Post')
-        obs.obs_data_set_default_string(settings_, 'match_wait', 'Match Wait')
+        obs.obs_data_set_default_string(settings_, 'match_load_f1', 'Match Load')
+        obs.obs_data_set_default_string(settings_, 'show_preview_f1', 'Show Preview')
+        obs.obs_data_set_default_string(settings_, 'show_random_f1', 'Show Random')
+        obs.obs_data_set_default_string(settings_, 'show_match_f1', 'Show Match')
+        obs.obs_data_set_default_string(settings_, 'match_start_f1', 'Match Start')
+        obs.obs_data_set_default_string(settings_, 'match_abort_f1', 'Match Abort')
+        obs.obs_data_set_default_string(settings_, 'match_commit_f1', 'Match Commit')
+        obs.obs_data_set_default_string(settings_, 'match_post_f1', 'Match Post')
+        obs.obs_data_set_default_string(settings_, 'match_wait_f1', 'Match Wait')
+
+        obs.obs_data_set_default_string(settings_, 'match_load_f2', '')
+        obs.obs_data_set_default_string(settings_, 'show_preview_f2', '')
+        obs.obs_data_set_default_string(settings_, 'show_random_f2', '')
+        obs.obs_data_set_default_string(settings_, 'show_match_f2', '')
+        obs.obs_data_set_default_string(settings_, 'match_start_f2', '')
+        obs.obs_data_set_default_string(settings_, 'match_abort_f2', '')
+        obs.obs_data_set_default_string(settings_, 'match_commit_f2', '')
+        obs.obs_data_set_default_string(settings_, 'match_post_f2', '')
+        obs.obs_data_set_default_string(settings_, 'match_wait_f2', '')
 
         obs.obs_data_set_default_string(settings_, 'video_directory', tempfile.gettempdir())
         canvas_source = obs.obs_frontend_get_current_scene()
@@ -535,6 +557,7 @@ else:
         obs.obs_data_set_default_int(settings_, 'audio_bitrate', 192)
 
         obs.obs_data_set_default_string(settings_, 'match_type', 'qualification')
+        obs.obs_data_set_default_int(settings_, 'match_field', 1)
         obs.obs_data_set_default_int(settings_, 'match_pair', 1)
         obs.obs_data_set_default_int(settings_, 'match_number', 1)
         obs.obs_data_set_default_int(settings_, 'match_code', 1)
@@ -727,15 +750,21 @@ else:
                 if obs.obs_data_get_int(settings, 'match_wait_time') >= 0 and post_time >= 0 and time.time() >= post_time + obs.obs_data_get_int(settings, 'match_wait_time'):
                     # still in match post timer has been reached - set to match wait
                     scene = 'match_wait'
+                    field = 0
                 else:
                     # check websocket for events
                     msg = comm.get_nowait()
                     try:
                         scene = msg_mapping[msg['updateType']]
+                        field = msg['payload']['field']
                     except KeyError:
                         print(f'WARNING: Unknown WS match event type {msg["updateType"]}')
                         print()
                         continue
+
+                # ignore events for non-active field
+                if field > 0 and field != obs.obs_data_get_int(settings, 'match_field'):
+                    continue
 
                 # reset match post time (it gets overwritten again in conditional if transitioning to match_wait)
                 post_time = -1
@@ -751,34 +780,40 @@ else:
                 elif scene == 'match_post':
                     # record when a scene was switched to match post
                     post_time = time.time()
-                elif scene == 'match_wait':
-                    if obs.obs_output_active(output):
-                        stop_recording_and_upload()
                 elif scene == 'match_abort':
                     if obs.obs_output_active(output):
                         stop_recording_and_cancel()
+                elif scene == 'match_wait':
+                    if obs.obs_output_active(output):
+                        stop_recording_and_upload()
+
+                field_scene = scene + f'_f{obs.obs_data_get_int(settings, "match_field")}'
+
+                # ignore empty configured scene names
+                if not obs.obs_data_get_string(settings, field_scene):
+                    continue
 
                 # bail if not currently on a recognized scene
                 current_scene = obs.obs_frontend_get_current_scene()
                 current_scene_name = obs.obs_source_get_name(current_scene)
                 obs.obs_source_release(current_scene)
-                if not obs.obs_data_get_bool(settings, 'override_non_match_scenes') and current_scene_name not in map(lambda scene: obs.obs_data_get_string(settings, scene), msg_mapping.values()):
+                if not obs.obs_data_get_bool(settings, 'override_non_match_scenes') and current_scene_name not in map(lambda scene: obs.obs_data_get_string(settings, scene), itertools.chain((scene_option + '_f1' for scene_option in msg_mapping.values()), (scene_option + '_f2' for scene_option in msg_mapping.values()))):
                     print(f'WARNING: Ignoring scorekeeper event because the current scene is unrecognized and overriding unrecognized scenes is disabled')
                     print()
                     continue
 
-                print(f'Switching scene to {obs.obs_data_get_string(settings, scene)}')
+                print(f'Switching scene to {obs.obs_data_get_string(settings, field_scene)}')
                 print()
 
                 # find and set the current scene based on websocket or wait set above
                 sources = obs.obs_frontend_get_scenes()
                 for source in sources:
-                    if obs.obs_source_get_name(source) == obs.obs_data_get_string(settings, scene):
+                    if obs.obs_source_get_name(source) == obs.obs_data_get_string(settings, field_scene):
                         if obs.obs_frontend_get_current_scene() != source:
                             obs.obs_frontend_set_current_scene(source)
                         break
                 else:
-                    print(f'WARNING: Could not find scene {obs.obs_data_get_string(settings, scene)}')
+                    print(f'WARNING: Could not find scene {obs.obs_data_get_string(settings, field_scene)}')
                     print()
                 obs.source_list_release(sources)
         except queue.Empty:
@@ -813,6 +848,7 @@ else:
 
     def reset_match_info(_prop=None, _props=None):
         obs.obs_data_set_string(settings, 'match_type', 'qualification')
+        obs.obs_data_set_int(settings, 'match_field', 1)
         obs.obs_data_set_int(settings, 'match_pair', 1)
         obs.obs_data_set_int(settings, 'match_number', 1)
         obs.obs_data_set_int(settings, 'match_code', 1)
@@ -970,8 +1006,9 @@ else:
 
             os.close(log_fd)
 
-            obs.obs_data_set_int(settings, 'match_number', obs.obs_data_get_int(settings, 'match_number') + 1)
-            obs.obs_data_set_int(settings, 'match_code', obs.obs_data_get_int(settings, 'match_code') + 1)
+            if not thread or not thread.is_alive():
+                obs.obs_data_set_int(settings, 'match_number', obs.obs_data_get_int(settings, 'match_number') + 1)
+                obs.obs_data_set_int(settings, 'match_code', obs.obs_data_get_int(settings, 'match_code') + 1)
 
             print()
         elif action == 'cancel':
@@ -1008,8 +1045,11 @@ else:
                     match_data = json.load(matches)['matches']
 
                 if len(match_data) > 0:
+                    match_field = match_data[-1]['field']
                     match_name = match_data[-1]['matchName']
                     match_code = match_data[-1]['matchNumber']
+
+                    obs.obs_data_set_int(settings, 'match_field', match_field)
 
                     if match_name[0] == 'Q':
                         obs.obs_data_set_string(settings, 'match_type', 'qualification')
