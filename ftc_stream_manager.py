@@ -764,8 +764,8 @@ else:
                         print()
                         continue
 
-                # ignore events for non-active field
-                if match_field > 0 and match_field != obs.obs_data_get_int(settings, 'match_field'):
+                # ignore load events for non-active field
+                if scene == 'match_load' and match_field > 0 and match_field != obs.obs_data_get_int(settings, 'match_field'):
                     continue
 
                 # reset match post time (it gets overwritten again in conditional if transitioning to match_wait)
