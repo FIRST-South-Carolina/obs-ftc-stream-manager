@@ -491,10 +491,9 @@ else:
 
         match_type_prop = obs.obs_properties_add_list(match_props, 'match_type', 'Match Type', obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
         obs.obs_property_list_add_string(match_type_prop, 'Qualification', 'qualification')
-        obs.obs_property_list_add_string(match_type_prop, 'Semi-Final', 'semi-final')
+        obs.obs_property_list_add_string(match_type_prop, 'Playoff', 'playoff')
         obs.obs_property_list_add_string(match_type_prop, 'Final', 'final')
         obs.obs_properties_add_int(match_props, 'match_field', 'Match Field', 1, 2, 1)
-        obs.obs_properties_add_int(match_props, 'match_pair', 'Match Pair', 1, 2, 1)
         obs.obs_properties_add_int(match_props, 'match_number', 'Match Number', 1, 1000, 1)
         obs.obs_properties_add_int(match_props, 'match_code', 'Match Code', 1, 1000, 1)
 
@@ -558,7 +557,6 @@ else:
 
         obs.obs_data_set_default_string(settings_, 'match_type', 'qualification')
         obs.obs_data_set_default_int(settings_, 'match_field', 1)
-        obs.obs_data_set_default_int(settings_, 'match_pair', 1)
         obs.obs_data_set_default_int(settings_, 'match_number', 1)
         obs.obs_data_set_default_int(settings_, 'match_code', 1)
 
@@ -734,6 +732,7 @@ else:
         if not obs.obs_data_get_bool(settings, 'switcher_enabled'):
             return
 
+        # TODO: implement websocket retrying (e.g. wait 20 seconds and retry up to 5 times before giving up?)
         if thread and not thread.is_alive():
             # thread died and needs to be retried or cleaned up
             print(f'ERROR: Connection to scorekeeper WS failed')
@@ -847,8 +846,8 @@ else:
         match_type = obs.obs_data_get_string(settings, 'match_type')
         if match_type == 'final':
             return f'Finals Match {obs.obs_data_get_int(settings, "match_number")}'
-        elif match_type == 'semi-final':
-            return f'Semifinals {obs.obs_data_get_int(settings, "match_pair")} Match {obs.obs_data_get_int(settings, "match_number")}'
+        elif match_type == 'playoff':
+            return f'Playoff Match {obs.obs_data_get_int(settings, "match_number")}'
         elif match_type == 'qualification':
             return f'Qualifications Match {obs.obs_data_get_int(settings, "match_number")}'
         else:
@@ -858,7 +857,6 @@ else:
     def reset_match_info(_prop=None, _props=None):
         obs.obs_data_set_string(settings, 'match_type', 'qualification')
         obs.obs_data_set_int(settings, 'match_field', 1)
-        obs.obs_data_set_int(settings, 'match_pair', 1)
         obs.obs_data_set_int(settings, 'match_number', 1)
         obs.obs_data_set_int(settings, 'match_code', 1)
 
@@ -871,21 +869,13 @@ else:
 
         if match_name[0] == 'Q':
             obs.obs_data_set_string(settings, 'match_type', 'qualification')
-            obs.obs_data_set_int(settings, 'match_pair', 1)
             obs.obs_data_set_int(settings, 'match_number', int(match_name[1:]))
-        elif match_name[0:2] == 'SF' or match_name[0] == 'F':
-            if obs.obs_data_get_string(settings, 'scorekeeper_api') and obs.obs_data_get_string(settings, 'event_code'):
-                with urllib.request.urlopen(f'{obs.obs_data_get_string(settings, "scorekeeper_api")}/v1/events/{obs.obs_data_get_string(settings, "event_code")}/elim/all/', timeout=1) as elims:
-                    match_code = len(json.load(elims)['matchList']) + 1
-
-            if match_name[0] == 'F':
-                obs.obs_data_set_string(settings, 'match_type', 'final')
-                obs.obs_data_set_int(settings, 'match_pair', 1)
-                obs.obs_data_set_int(settings, 'match_number', int(match_name[2:]))
-            else:
-                obs.obs_data_set_string(settings, 'match_type', 'semi-final')
-                obs.obs_data_set_int(settings, 'match_pair', int(match_name[2]))
-                obs.obs_data_set_int(settings, 'match_number', int(match_name[4:]))
+        elif match_name[0] == 'M':
+            obs.obs_data_set_string(settings, 'match_type', 'playoff')
+            obs.obs_data_set_int(settings, 'match_number', int(match_name[1:]))
+        elif match_name[0] == 'F':
+            obs.obs_data_set_string(settings, 'match_type', 'final')
+            obs.obs_data_set_int(settings, 'match_number', int(match_name[2:]))
         else:
             print(f'WARNING: Unknown match type "{match_name}"')
             obs.obs_data_set_int(settings, 'match_number', match_code)
