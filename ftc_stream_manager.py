@@ -422,6 +422,7 @@ else:
         obs.obs_properties_add_bool(switcher_props, 'switcher_recording', 'Automatic Recording on Switches')
         obs.obs_properties_add_bool(switcher_props, 'override_non_match_scenes', 'Override Non-Match Scenes')
         obs.obs_properties_add_int(switcher_props, 'match_wait_time', 'Match Post Time to Match Wait', -1, 600, 1)
+        obs.obs_properties_add_int(switcher_props, 'match_finals_field', 'Match Field for Finals (Field 0)', 1, 2, 1)
 
         scene_props = obs.obs_properties_create()
         obs.obs_properties_add_group(props, 'scene', 'Scenes', obs.OBS_GROUP_NORMAL, scene_props)
@@ -524,6 +525,7 @@ else:
         obs.obs_data_set_default_bool(settings_, 'switcher_recording', True)
         obs.obs_data_set_default_bool(settings_, 'override_non_match_scenes', False)
         obs.obs_data_set_default_int(settings_, 'match_wait_time', 30)
+        obs.obs_data_set_default_int(settings_, 'match_finals_field', 1)
 
         obs.obs_data_set_default_string(settings_, 'match_load_f1', 'Match Load')
         obs.obs_data_set_default_string(settings_, 'show_preview_f1', 'Show Preview')
@@ -755,7 +757,7 @@ else:
                     msg = comm.get_nowait()
                     try:
                         scene = msg_mapping[msg['updateType']]
-                        match_field = msg['payload']['field']
+                        match_field = msg['payload']['field'] if msg['payload']['field'] != 0 else obs.obs_data_get_int(settings, 'match_finals_field')
                         match_name = msg['payload']['shortName']
                         match_code = msg['payload']['number']
                     except KeyError:
@@ -1071,7 +1073,7 @@ else:
                     match_data = json.load(matches)['matches']
 
                 if len(match_data) > 0:
-                    match_field = match_data[-1]['field']
+                    match_field = match_data[-1]['field'] if match_data[-1]['field'] != 0 else obs.obs_data_get_int(settings, 'match_finals_field')
                     match_name = match_data[-1]['matchName']
                     match_code = match_data[-1]['matchNumber']
 
