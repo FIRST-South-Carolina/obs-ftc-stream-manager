@@ -245,7 +245,7 @@ else:
     import urllib.error
     import urllib.request
 
-    import websockets.client
+    import websockets
 
 
     if sys.platform == 'win32':
@@ -260,6 +260,9 @@ else:
 
     comm = None  # pylint: disable=invalid-name
     stop = None  # pylint: disable=invalid-name
+
+    retry_count = 0  # pylint: disable=invalid-name
+    retry_time = -1  # pylint: disable=invalid-name
 
     output = None  # pylint: disable=invalid-name
     output_video_encoder = None  # pylint: disable=invalid-name
@@ -729,22 +732,44 @@ else:
 
 
     def check_websocket():
-        global thread, post_time  # pylint: disable=invalid-name
+        global thread, retry_count, retry_time, post_time  # pylint: disable=invalid-name
 
         if not obs.obs_data_get_bool(settings, 'switcher_enabled'):
             return
 
-        # TODO: implement websocket retrying (e.g. wait 20 seconds and retry up to 5 times before giving up?)
         if thread and not thread.is_alive():
-            # thread died and needs to be retried or cleaned up
-            print(f'ERROR: Connection to scorekeeper WS failed')
-            print()
+            if retry_time < 0:
+                # thread died and needs to be retried or cleaned up
+                print(f'ERROR: Connection to scorekeeper WS failed and will be retried')
+                print()
 
-            # disable switcher to prevent failure spam
-            stop.set()
-            thread = None
+                # start retry timer
+                retry_time = time.time()
 
-            # no return to let queue continue to be cleared since we are enabled
+            # retry up to 5 times every 20 seconds
+            if retry_count < 5:
+                if time.time() >= retry_time + 20:
+                    connect_scorekeeper_websocket()
+                    retry_count += 1
+                    retry_time = time.time()
+            else:
+                # disable switcher after too many failures
+                print(f'ERROR: Connection to scorekeeper WS failed too many times')
+                print()
+
+                # clean up thread
+                stop.set()
+                thread = None
+
+                # reset retries
+                retry_count = 0
+                retry_time = -1
+
+            # no return on error to let queue continue to be cleared since we are enabled
+        else:
+            # reset retries if websocket connection successful
+            retry_count = 0
+            retry_time = -1
 
         try:
             while True:
@@ -752,6 +777,8 @@ else:
                     # still in match post timer has been reached - set to match wait
                     scene = 'match_wait'
                     match_field = 0
+                    match_name = ''
+                    match_code = 0
                 else:
                     # check websocket for events
                     msg = comm.get_nowait()
@@ -831,7 +858,7 @@ else:
 
 
     async def run_websocket(uri):
-        async with websockets.client.connect(uri) as websocket:
+        async with websockets.connect(uri) as websocket:
             # thread kill-switch check
             while not stop.is_set():
                 try:
