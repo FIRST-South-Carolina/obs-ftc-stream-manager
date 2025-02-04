@@ -878,7 +878,7 @@ else:
         elif match_type == 'playoff':
             return f'Playoff Match {obs.obs_data_get_int(settings, "match_number")}'
         elif match_type == 'qualification':
-            return f'Qualifications Match {obs.obs_data_get_int(settings, "match_number")}'
+            return f'Qualification Match {obs.obs_data_get_int(settings, "match_number")}'
         else:
             return f'Match {obs.obs_data_get_int(settings, "match_number")}'
 
@@ -1026,7 +1026,7 @@ else:
             print(f'Uploading recording for {get_match_name()} at "{video_path}"')
 
             if not obs.obs_data_get_string(settings, 'google_project_id') or not obs.obs_data_get_string(settings, 'google_client_id') or not obs.obs_data_get_string(settings, 'google_client_secret'):
-                print(f'ERROR: Google API Project ID, Client ID, and Client Secret are all required')
+                print(f'Not uploading match because Google API Project ID, Client ID, or Client Secret are absent')
                 print()
                 return
 
