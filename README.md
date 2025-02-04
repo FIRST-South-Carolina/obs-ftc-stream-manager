@@ -7,24 +7,24 @@ Keep the OBS "Script Log" open to see output from events, hotkeys, and settings 
 
 ## OBS Scripting Setup
 
-The FTC Stream Manager script requires [OBS Studio](https://obsproject.com/) and Python 3.6+. OBS Studio supports current Python versions now on Windows, so grab the latest stable "Windows installer (64-bit)" build available at [python.org](https://www.python.org/downloads/windows/) (currently [3.10.9](https://www.python.org/ftp/python/3.10.9/python-3.10.9-amd64.exe)). From the OBS Studio software, select "Tools" from the menu bar and "Scripts" from the menu, go to the "Python Settings" tab, and select the base prefix for Python 3.6+. For Windows, the base prefix will be `%LOCALAPPDATA%\Programs\Python\Python310` (for Python 3.10). To load one of the scripts below, go back to the "Scripts" tab and click the "+" in the lower-left and navigate to the appropriate script file.
+The FTC Stream Manager script requires [OBS Studio](https://obsproject.com/) and Python 3.6+. OBS Studio supports current Python versions now on Windows, so grab the latest stable "Windows installer (64-bit)" build available at [python.org](https://www.python.org/downloads/windows/) (currently [3.12.9](https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe)). From the OBS Studio software, select "Tools" from the menu bar and "Scripts" from the menu, go to the "Python Settings" tab, and select the base prefix for Python 3.6+. For Windows, the base prefix will be `%LOCALAPPDATA%\Programs\Python\Python312` (for Python 3.12). To load one of the scripts below, go back to the "Scripts" tab and click the "+" in the lower-left and navigate to the appropriate script file.
 
 
 ## FTC Stream Manager Setup
 
-To set up FTC Stream Manager for subsequent use (as in this only needs to be done once per system), the `google-api-python-client`, `google-auth-oauthlib`, and `websockets` Python packages must be installed. To install them in Windows, open a PowerShell or CMD command prompt and run the command `%LOCALAPPDATA%\Programs\Python\Python310\Scripts\pip.exe install -U google-api-python-client google-auth-oauthlib websockets` (for Python 3.10).
+To set up FTC Stream Manager for subsequent use (as in this only needs to be done once per system), the `google-api-python-client`, `google-auth-oauthlib`, and `websockets` Python packages must be installed. To install them in Windows, open a PowerShell or CMD command prompt and run the command `%LOCALAPPDATA%\Programs\Python\Python312\Scripts\pip.exe install -U google-api-python-client google-auth-oauthlib websockets` (for Python 3.12).
 
 
 ## OBS Profile Setup
 
-Load `ftc-stream-manager.py` into OBS Studio. Go to the OBS settings by selecting "File" from the menu bar and "Settings" from the menu. Go to the "Hotkeys" section and assign hotkeys for the actions that start with "(FTC)" by selecting the box to the right of the action description and pressing the desired key combination. These will be saved for later when this script is loaded again.
+Load `ftc_stream_manager.py` into OBS Studio. Go to the OBS settings by selecting "File" from the menu bar and "Settings" from the menu. Go to the "Hotkeys" section and assign hotkeys for the actions that start with "(FTC)" by selecting the box to the right of the action description and pressing the desired key combination. These will be saved for later when this script is loaded again.
 
 The hotkey for "Start recording a match" should be pressed when a match is about to begin and the match video should start. I recommend doing this right before randomization so that can be captured in the video. The hotkey for "Stop recording a match and upload to YouTube" should be pressed when a match is complete. I recommend doing this right after the final scores are announced so that can be captured in the video. The hotkey for "Stop recording a match but cancel uploading to YouTube" should be used if a recording needs to be aborted, if for example the match is aborted or randomization needs to happen again. If the recording is aborted, the portion that was recorded is still saved to the hard drive but it will not be uploaded.
 
 
 ## Usage
 
-Load `ftc-stream-manager.py` into OBS Studio (if not already loaded). In the script configuration section, add details for the following:
+Load `ftc_stream_manager.py` into OBS Studio (if not already loaded). In the script configuration section, add details for the following:
 
 * Event Name - current event name to use when naming videos
 * YouTube Description - description for the uploaded videos
@@ -39,13 +39,15 @@ Load `ftc-stream-manager.py` into OBS Studio (if not already loaded). In the scr
 * TOA Key (optional) - key for The Orange Alliance API which has access to set match videos for the current event (generally event admin or enough permission to do DataSync will work)
 * TOA Event Code (optional) - event code in The Orange Alliance for the current event
 
-* Google API Project ID - project ID to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
-* Google API Client ID - client ID to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
-* Google API Client Secret - client secret to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
+* Google API Project ID (optional) - project ID to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
+* Google API Client ID (optional) - client ID to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
+* Google API Client Secret (optional) - client secret to authenticate to Google APIs (generated from Google Cloud Platform Console for your organization)
 
-* Automatic Switcher and Recording Handler - whether the automatic scene switcher and recording handler is enabled
+* Automatic Switcher - whether the automatic scene switcher is enabled
+* Automatic Recording on Switches - whether the scene switcher will automatically start and stop recording when receiving appropriate events
 * Override Non-Match Scenes - whether the scene switcher will switch from non-match-related scenes when receiving a match event
 * Match Post Time to Match Wait - time after a match score is posted before the scene is switched to match wait scene (-1 to disable)
+* Match Field for Finals (Field 0) - field number expected to be used for finals to ensure proper scene switching
 
 * Match Load - scene name to show when a match is loaded
 * Match Start - scene name to show when a match is started
@@ -53,6 +55,13 @@ Load `ftc-stream-manager.py` into OBS Studio (if not already loaded). In the scr
 * Match Commit - scene name to show when a match score is committed
 * Match Post - scene name to show when a match score is posted
 * Match Wait - scene name to show after a specified timer after a match score is posted
+
+* Video Directory - directory to record match videos to
+* Output Resolution - possibly scaled resolution to output for match videos
+* Video Encoder (H.264) - encoder to use for video output (prefer a hardware encoder (i.e. __not__ x264) if available)
+* Video Bitrate - bitrate to use for encoding video output
+* Audio Encoder (AAC) - encoder to use for audio output
+* Audio Bitrate - bitrate to use for encoding audio output
 
 Assuming connection to the scorekeeper is successful, the match type, pair, number, and code data will be automatically populated. Do not change those settings if intending to use this with the FTCLive scoring software.
 
